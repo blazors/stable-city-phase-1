@@ -11,6 +11,7 @@ type Task = {
   requestedStrategy: RequestedStrategy
   strategy: 'local-template'
   provider: 'none'
+  fallbackReason: 'auto-local' | 'provider-unavailable'
   output: string
   status: 'queued' | 'review' | 'approved' | 'rejected'
 }
@@ -78,8 +79,8 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       '氛围候选：保持时段主导光照；主题仅调整材质与环境偏色，远景逐步降低饱和度。',
     ]
     setTasks(prev => prev.map(task => task.id === next.id ? { ...task, status: 'review', output: proposals[(task.id - 1) % 3] } : task))
-    setMessage(`已按 ${next.capability} 路由执行：请求 ${next.requestedStrategy}，实际 local-template，等待人工审核。`)
-    logEvent(`run · task:${next.id} · ${next.capability} · ${next.requestedStrategy}→local-template`)
+    setMessage(`已按 ${next.capability} 路由执行：请求 ${next.requestedStrategy}，实际 local-template（${next.fallbackReason}），等待人工审核。`)
+    logEvent(`run · task:${next.id} · ${next.capability} · ${next.requestedStrategy}→local-template · ${next.fallbackReason}`)
   }
 
   function review(id: number, status: 'approved' | 'rejected') {
@@ -117,7 +118,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <div className="task-summary"><span>queued <b>{statusCounts.queued}</b></span><span>review <b>{statusCounts.review}</b></span><span>approved <b>{statusCounts.approved}</b></span><span>rejected <b>{statusCounts.rejected}</b></span><span>cost <b>$0.00</b></span></div>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
       <div className="task-heading"><h4>{String(task.id).padStart(2, '0')} · {task.name}</h4><span>{statusLabels[task.status]}</span></div>
-      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>request:{task.requestedStrategy}</span><span>exec:{task.strategy}</span><span>provider:{task.provider}</span></div>
+      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>request:{task.requestedStrategy}</span><span>exec:{task.strategy}</span><span>provider:{task.provider}</span><span>fallback:{task.fallbackReason}</span></div>
       <details><summary>输入快照</summary><p>{task.input}</p></details>
       {task.output && <p className="candidate">{task.output}</p>}
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
