@@ -107,7 +107,20 @@ export function App() {
 
   function runThemeMatrixTest() {
     const names = Object.keys(themes) as ThemeName[]
-    const visualSignatures = new Set(names.map(name => [themes[name].primary, themes[name].accent, themes[name].atmosphere].join('|')))
+    const visualSignatures = new Set(names.map(name => JSON.stringify({
+      primary: themes[name].primary,
+      accent: themes[name].accent,
+      atmosphere: themes[name].atmosphere,
+      primaryHue: themes[name].primaryHue,
+      secondaryHue: themes[name].secondaryHue,
+      accentHue: themes[name].accentHue,
+      warmCoolRelation: themes[name].warmCoolRelation,
+      saturationProfile: themes[name].saturationProfile,
+      valueProfile: themes[name].valueProfile,
+      contrastMode: themes[name].contrastMode,
+      emissionHue: themes[name].emissionHue,
+      atmosphereTint: themes[name].atmosphereTint,
+    })))
     const themeSpecDistinct = visualSignatures.size === names.length
     const result = Object.fromEntries(names.map(name => [name, { stableCity: getStableCitySignature(city) === baselineSignature, themeSpecDistinct }])) as Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }>
     setThemeMatrixResult(result)
@@ -137,7 +150,7 @@ export function App() {
       themeMatrixTest: themeMatrixResult,
       themeMatrixEvidence: themeMatrixResult ? Object.fromEntries((Object.keys(themes) as ThemeName[]).map(name => [name, {
         ...themeMatrixResult[name],
-        spec: { primary: themes[name].primary, accent: themes[name].accent, atmosphere: themes[name].atmosphere },
+        spec: themes[name],
       }])) : null,
       visualChecks: visualChecks.map(name => ({ name, checked: checked.includes(name) })),
       qualityGate: qualityGate ? 'PASS' : 'INCOMPLETE',
