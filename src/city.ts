@@ -26,6 +26,7 @@ export function validateStableCity(city: StableCity): { valid: boolean; issues: 
   if (city.transport.mainSpine !== 'east-west' || !city.transport.elevatedRail || city.transport.stationCount !== 1) issues.push('transport')
   if (city.heroBlock !== '1:2' || city.secondaryPeaks.length !== 2 || city.publicVoids.length !== 2) issues.push('composition')
   if (getStableCitySignature(city) !== city.signature) issues.push('signature')
+  if (createStableCity(city.seed).signature !== city.signature) issues.push('determinism')
   return { valid: issues.length === 0, issues }
 }
 

@@ -92,11 +92,12 @@ export function App() {
   const [metrics, setMetrics] = useState<RenderMetrics | null>(null)
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
+  const [qcIssues, setQcIssues] = useState<string[]>([])
   const [themeOffResult, setThemeOffResult] = useState<boolean | null>(null)
   const [themeMatrixResult, setThemeMatrixResult] = useState<Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }> | null>(null)
   const [reportMessage, setReportMessage] = useState('')
   const [checked, setChecked] = useState<string[]>([])
-  useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
+  useEffect(() => { setChecked([]); setQcResult(null); setQcIssues([]) }, [time, mode, theme, enabled])
   useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
   useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
   useEffect(() => { setThemeMatrixResult(null) }, [time, mode])
@@ -111,6 +112,13 @@ export function App() {
     setThemeMatrixResult(result)
   }
 
+  function runStructureCheck() {
+    const validation = validateStableCity(city)
+    const baselineMatch = getStableCitySignature(city) === baselineSignature
+    setQcIssues([...validation.issues, ...(baselineMatch ? [] : ['baseline'])])
+    setQcResult(validation.valid && baselineMatch)
+  }
+
   function exportQualityReport() {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -122,6 +130,7 @@ export function App() {
       camera: mode,
       metrics: metrics ? { ...metrics, loadMs } : { loadMs },
       structureCheck: qcResult,
+      structureIssues: qcIssues,
       themeOffTest: themeOffResult,
       themeMatrixTest: themeMatrixResult,
       themeMatrixEvidence: themeMatrixResult ? Object.fromEntries((Object.keys(themes) as ThemeName[]).map(name => [name, {
@@ -194,8 +203,8 @@ export function App() {
             <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
             <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
-            <button className="primary" onClick={() => setQcResult(validateStableCity(city).valid && getStableCitySignature(city) === baselineSignature)}>运行结构检查</button>
-            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : '未通过：StableCity 签名发生变化。'}</p>
+            <button className="primary" onClick={runStructureCheck}>运行结构检查</button>
+            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : `未通过：${qcIssues.join('、') || 'baseline'}。`}</p>
             <h3>Theme OFF Test</h3><p className="help">关闭主题覆盖，确认主题不会改写 StableCity 基线。</p>
             <button className="primary" onClick={() => { setEnabled(false); setThemeOffResult(getStableCitySignature(city) === baselineSignature) }}>运行 Theme OFF Test</button>
             <p className="result" role="status">{themeOffResult === null ? '尚未检查' : themeOffResult ? '通过：主题关闭后 StableCity 签名保持一致。' : '未通过：主题关闭后结构发生变化。'}</p>
