@@ -5,14 +5,10 @@ import type { Mesh, WebGLRenderer } from 'three'
 import { Color } from 'three'
 import { createStableCity, getStableCitySignature, type TimeOfDay } from './city'
 import { ProductionPanel } from './ProductionPanel'
+import { themeSpecs, type ThemeName } from './theme'
 
 const city = createStableCity()
-type ThemeName = 'harbor' | 'verdant' | 'ember'
-const themes: Record<ThemeName, { label: string; primary: string; accent: string; atmosphere: string }> = {
-  harbor: { label: 'Harbor Mineral', primary: '#315f68', accent: '#e2b273', atmosphere: '#89aeb1' },
-  verdant: { label: 'Verdant Relay', primary: '#365e50', accent: '#e1bd69', atmosphere: '#91ae87' },
-  ember: { label: 'Ember Foundry', primary: '#6b4541', accent: '#efb07b', atmosphere: '#b87a70' }
-}
+const themes = themeSpecs
 const palettes: Record<TimeOfDay, { sky: string; fog: string; ground: string; key: string; window: string; ambient: string }> = {
   day: { sky: '#8db8c9', fog: '#a6c8ca', ground: '#385762', key: '#fff0cc', window: '#ffd99a', ambient: '#9ac4cb' },
   sunset: { sky: '#a57182', fog: '#b77f78', ground: '#493648', key: '#ffd09a', window: '#ffca8a', ambient: '#be7489' },
@@ -169,7 +165,7 @@ export function App() {
             <div className="section-heading"><h3>Debug</h3><span>READ ONLY</span></div>
             <p className="help">查看本次场景装配的输入、策略与限制。</p>
             <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>UrbanGrammar</span><b>{city.urbanGrammar.primaryAxis} / {city.urbanGrammar.secondaryRoads} secondary</b></div><div><span>Composition</span><b>hero {city.heroBlock} / peaks {city.secondaryPeaks.length} / voids {city.publicVoids.length}</b></div><div><span>Transport</span><b>{city.transport.mainSpine} / rail {city.transport.elevatedRail ? 'on' : 'off'}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
-            <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ identity: themeLabels[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked', accent: themes[theme].accent }, null, 2)}</pre>
+            <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ ...themes[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked' }, null, 2)}</pre>
             <h3>运行日志</h3><div className="log"><span>[scene] stable city assembled</span><span>[theme] overlay {enabled ? 'applied' : 'disabled'}</span><span>[qc] awaiting manual visual review</span></div>
           </>}
         </div>
