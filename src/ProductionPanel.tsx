@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { interpretThemeBrief, themeSpecs, type ThemeName } from './theme'
+import { routeCapability, type Capability } from './router'
 
 type Task = {
   id: number
   name: string
   input: string
   themeVersion: string
-  execution: 'local-template'
+  capability: Capability
+  strategy: 'local-template'
+  provider: 'none'
   output: string
   status: 'queued' | 'review' | 'approved' | 'rejected'
 }
@@ -31,7 +34,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       name,
       input: input + ' / Seed ' + seed + ' / ' + theme,
       themeVersion: `${interpretedTheme}-local-01`,
-      execution: 'local-template',
+      ...routeCapability(name),
       output: '',
       status: 'queued',
     }))])
@@ -58,7 +61,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       '氛围候选：保持时段主导光照；主题仅调整材质与环境偏色，远景逐步降低饱和度。',
     ]
     setTasks(prev => prev.map(task => task.id === next.id ? { ...task, status: 'review', output: proposals[(task.id - 1) % 3] } : task))
-    setMessage('已生成本地模板候选，等待人工审核。')
+    setMessage(`已按 ${next.capability} 路由生成本地候选，等待人工审核。`)
   }
 
   function review(id: number, status: 'approved' | 'rejected') {
@@ -80,7 +83,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
       <div className="task-heading"><h4>{String(task.id).padStart(2, '0')} · {task.name}</h4><span>{statusLabels[task.status]}</span></div>
-      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.execution}</span></div>
+      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>{task.strategy}</span><span>provider:{task.provider}</span></div>
       <details><summary>输入快照</summary><p>{task.input}</p></details>
       {task.output && <p className="candidate">{task.output}</p>}
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
