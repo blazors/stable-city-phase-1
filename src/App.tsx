@@ -124,6 +124,10 @@ export function App() {
       structureCheck: qcResult,
       themeOffTest: themeOffResult,
       themeMatrixTest: themeMatrixResult,
+      themeMatrixEvidence: themeMatrixResult ? Object.fromEntries((Object.keys(themes) as ThemeName[]).map(name => [name, {
+        ...themeMatrixResult[name],
+        spec: { primary: themes[name].primary, accent: themes[name].accent, atmosphere: themes[name].atmosphere },
+      }])) : null,
       visualChecks: visualChecks.map(name => ({ name, checked: checked.includes(name) })),
       qualityGate: qualityGate ? 'PASS' : 'INCOMPLETE',
       aiVisualJudge: 'not executed',
@@ -198,6 +202,12 @@ export function App() {
             <h3>Theme Matrix Test</h3><p className="help">遍历三个 ThemeSpec，确认同一 CitySeed 的 StableCity 签名保持一致。</p>
             <button className="primary" onClick={runThemeMatrixTest}>运行 Theme Matrix Test</button>
             <p className="result" role="status">{themeMatrixResult === null ? '尚未检查' : themeMatrixPass ? '通过：StableCity 签名一致，三个 ThemeSpec 保持可区分。' : `未通过：${Object.entries(themeMatrixResult).filter(([, result]) => !result.stableCity || !result.themeSpecDistinct).map(([name]) => name).join('、')} 存在结构或主题差异问题。`}</p>
+            {themeMatrixResult && <div className="theme-matrix-results" aria-label="Theme Matrix 逐项结果">
+              {(Object.keys(themes) as ThemeName[]).map(name => {
+                const result = themeMatrixResult[name]
+                return <div key={name}><span>{themeLabels[name]}</span><b>{result.stableCity ? 'StableCity PASS' : 'StableCity FAIL'} · {result.themeSpecDistinct ? 'Spec DISTINCT' : 'Spec COLLISION'}</b></div>
+              })}
+            </div>}
             <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
