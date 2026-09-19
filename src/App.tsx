@@ -3,7 +3,7 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import type { Mesh, WebGLRenderer } from 'three'
 import { Color } from 'three'
-import { createStableCity, type TimeOfDay } from './city'
+import { createStableCity, getStableCitySignature, type TimeOfDay } from './city'
 import { ProductionPanel } from './ProductionPanel'
 
 const city = createStableCity()
@@ -82,7 +82,7 @@ function Scene({ time, mode, theme, enabled, onUpdate, onReady }: {
   </Canvas>
 }
 
-const baseline = JSON.stringify(city)
+const baselineSignature = city.signature
 const timeLabels = { day: '白昼', sunset: '日落', night: '夜晚' }
 const themeLabels = { harbor: '矿石港湾', verdant: '绿洲中继', ember: '余烬铸城' }
 const visualChecks = ['明暗与色彩层级', '巨构主角与剪影', '空间纵深与材质', '关闭主题后的可读性']
@@ -152,8 +152,8 @@ export function App() {
             <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
             <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
-            <button className="primary" onClick={() => setQcResult(JSON.stringify(city) === baseline && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
-            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? '通过：城市数据与基准一致，16 街区 / 60 建筑。' : '未通过：城市数据发生变化。'}</p>
+            <button className="primary" onClick={() => setQcResult(getStableCitySignature(city) === baselineSignature && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
+            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑。` : '未通过：StableCity 签名发生变化。'}</p>
             <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
@@ -162,7 +162,7 @@ export function App() {
           {panel === 'debug' && <>
             <div className="section-heading"><h3>Debug</h3><span>READ ONLY</span></div>
             <p className="help">查看本次场景装配的输入、策略与限制。</p>
-            <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
+            <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
             <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ identity: themeLabels[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked', accent: themes[theme].accent }, null, 2)}</pre>
             <h3>运行日志</h3><div className="log"><span>[scene] stable city assembled</span><span>[theme] overlay {enabled ? 'applied' : 'disabled'}</span><span>[qc] awaiting manual visual review</span></div>
           </>}

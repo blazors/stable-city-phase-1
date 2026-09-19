@@ -1,7 +1,18 @@
 export type TimeOfDay = 'day' | 'sunset' | 'night'
 export type Building = { id: string; x: number; z: number; width: number; depth: number; height: number; tone: number }
 export type Block = { id: string; x: number; z: number; kind: 'urban' | 'void' | 'mega' }
-export type StableCity = { seed: number; blocks: Block[]; buildings: Building[] }
+export type StableCity = { seed: number; blocks: Block[]; buildings: Building[]; signature: string }
+type StableCityData = Omit<StableCity, 'signature'>
+
+export function getStableCitySignature(city: StableCityData): string {
+  const source = JSON.stringify({ seed: city.seed, blocks: city.blocks, buildings: city.buildings })
+  let hash = 2166136261
+  for (let i = 0; i < source.length; i++) {
+    hash ^= source.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `stable-${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
 
 // Mulberry32 makes layout independent from rendering, theme, and environment state.
 const random = (seed: number) => () => { let t = seed += 0x6d2b79f5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296 }
@@ -29,5 +40,6 @@ export function createStableCity(seed = 240319): StableCity {
       }
     }
   }
-  return { seed, blocks, buildings }
+  const stableCity = { seed, blocks, buildings }
+  return { ...stableCity, signature: getStableCitySignature(stableCity) }
 }
