@@ -8,13 +8,25 @@ export type StableCity = { seed: number; blocks: Block[]; buildings: Building[];
 type StableCityData = Omit<StableCity, 'signature'>
 
 export function getStableCitySignature(city: StableCityData): string {
-  const source = JSON.stringify({ seed: city.seed, blocks: city.blocks, buildings: city.buildings })
+  const source = JSON.stringify({ seed: city.seed, blocks: city.blocks, buildings: city.buildings, parcels: city.parcels, urbanGrammar: city.urbanGrammar, transport: city.transport, heroBlock: city.heroBlock, secondaryPeaks: city.secondaryPeaks, publicVoids: city.publicVoids })
   let hash = 2166136261
   for (let i = 0; i < source.length; i++) {
     hash ^= source.charCodeAt(i)
     hash = Math.imul(hash, 16777619)
   }
   return `stable-${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
+
+export function validateStableCity(city: StableCity): { valid: boolean; issues: string[] } {
+  const issues: string[] = []
+  if (city.blocks.length !== 16) issues.push('blocks')
+  if (city.buildings.length !== 60) issues.push('buildings')
+  if (city.parcels.length !== city.buildings.length) issues.push('parcels')
+  if (city.urbanGrammar.primaryAxis !== 'north-south' || city.urbanGrammar.secondaryRoads !== 4 || city.urbanGrammar.localStreets !== 16 || city.urbanGrammar.publicVoids !== 2 || city.urbanGrammar.densityBands.join('|') !== 'core|edge') issues.push('urbanGrammar')
+  if (city.transport.mainSpine !== 'east-west' || !city.transport.elevatedRail || city.transport.stationCount !== 1) issues.push('transport')
+  if (city.heroBlock !== '1:2' || city.secondaryPeaks.length !== 2 || city.publicVoids.length !== 2) issues.push('composition')
+  if (getStableCitySignature(city) !== city.signature) issues.push('signature')
+  return { valid: issues.length === 0, issues }
 }
 
 // Mulberry32 makes layout independent from rendering, theme, and environment state.

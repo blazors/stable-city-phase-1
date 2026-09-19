@@ -3,7 +3,7 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import type { Mesh, WebGLRenderer } from 'three'
 import { Color } from 'three'
-import { createStableCity, getStableCitySignature, type TimeOfDay } from './city'
+import { createStableCity, getStableCitySignature, validateStableCity, type TimeOfDay } from './city'
 import { ProductionPanel } from './ProductionPanel'
 import { themeSpecs, type ThemeName } from './theme'
 
@@ -194,7 +194,7 @@ export function App() {
             <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
             <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
-            <button className="primary" onClick={() => setQcResult(getStableCitySignature(city) === baselineSignature && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
+            <button className="primary" onClick={() => setQcResult(validateStableCity(city).valid && getStableCitySignature(city) === baselineSignature)}>运行结构检查</button>
             <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : '未通过：StableCity 签名发生变化。'}</p>
             <h3>Theme OFF Test</h3><p className="help">关闭主题覆盖，确认主题不会改写 StableCity 基线。</p>
             <button className="primary" onClick={() => { setEnabled(false); setThemeOffResult(getStableCitySignature(city) === baselineSignature) }}>运行 Theme OFF Test</button>
