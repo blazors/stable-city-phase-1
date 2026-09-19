@@ -92,6 +92,10 @@ textarea { display: block; width: 100%; resize: vertical; min-height: 80px; max-
 .metric-grid strong { display: block; color: #e4c392; font: 19px Consolas, monospace; font-variant-numeric: tabular-nums; }
 .metric-grid span { display: block; color: var(--muted); font: 9px Consolas, monospace; margin-top: 5px; }
 .cost-row, .debug-list > div { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding: 12px 0; font-size: 11px; }
+.quality-gate { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0 12px; color: var(--muted); font: 10px Consolas, monospace; }
+.quality-gate b { font-weight: 500; }
+.quality-gate .pass { color: #b8d59c; }
+.quality-gate .incomplete { color: #e4c392; }
 .cost-row b { color: #b9d58a; font-weight: 500; }
 .debug-list { margin: 16px 0 24px; }
 .debug-list > div span { color: var(--muted); }

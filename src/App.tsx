@@ -98,6 +98,7 @@ export function App() {
   useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
   useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
   useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
+  const qualityGate = qcResult === true && themeOffResult === true && checked.length === visualChecks.length && metrics !== null && loadMs !== null
 
   function exportQualityReport() {
     const payload = {
@@ -112,6 +113,7 @@ export function App() {
       structureCheck: qcResult,
       themeOffTest: themeOffResult,
       visualChecks: visualChecks.map(name => ({ name, checked: checked.includes(name) })),
+      qualityGate: qualityGate ? 'PASS' : 'INCOMPLETE',
       aiVisualJudge: 'not executed',
     }
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
@@ -120,7 +122,7 @@ export function App() {
     anchor.download = `stable-city-quality-${city.seed}.json`
     anchor.click()
     URL.revokeObjectURL(url)
-    setReportMessage('Quality Report 已导出；未调用 AI 视觉判定。')
+    setReportMessage(`Quality Report 已导出；qualityGate=${qualityGate ? 'PASS' : 'INCOMPLETE'}，未调用 AI 视觉判定。`)
   }
 
   return <main>
@@ -185,6 +187,7 @@ export function App() {
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
             <div className="cost-row"><span>本地运行成本</span><b>$0.00</b></div>
+            <div className="quality-gate"><span>Quality Gate</span><b className={qualityGate ? 'pass' : 'incomplete'}>{qualityGate ? 'PASS' : 'INCOMPLETE'}</b></div>
             <button className="primary" onClick={exportQualityReport}>导出 Quality Report</button>
             {reportMessage && <p className="result" role="status">{reportMessage}</p>}
           </>}
