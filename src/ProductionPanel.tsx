@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { interpretThemeBrief, themeSpecs, type ThemeName } from './theme'
-import { routeCapability, type Capability } from './router'
+import { routeCapability, type Capability, type RequestedStrategy } from './router'
 
 type Task = {
   id: number
@@ -8,6 +8,7 @@ type Task = {
   input: string
   themeVersion: string
   capability: Capability
+  requestedStrategy: RequestedStrategy
   strategy: 'local-template'
   provider: 'none'
   output: string
@@ -19,6 +20,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   const [brief, setBrief] = useState('完善立面节奏、交通尺度参照和环境色层次。')
   const [tasks, setTasks] = useState<Task[]>([])
   const [message, setMessage] = useState('')
+  const [requestedStrategy, setRequestedStrategy] = useState<RequestedStrategy>('auto')
   const [themeCandidate, setThemeCandidate] = useState<ThemeName | null>(null)
   const [themeCandidateStatus, setThemeCandidateStatus] = useState<'preview' | 'confirmed' | 'rejected' | null>(null)
   const interpretedTheme = interpretThemeBrief(brief)
@@ -34,7 +36,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       name,
       input: input + ' / Seed ' + seed + ' / ' + theme,
       themeVersion: `${interpretedTheme}-local-01`,
-      ...routeCapability(name),
+      ...routeCapability(name, requestedStrategy),
       output: '',
       status: 'queued',
     }))])
@@ -61,7 +63,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       '氛围候选：保持时段主导光照；主题仅调整材质与环境偏色，远景逐步降低饱和度。',
     ]
     setTasks(prev => prev.map(task => task.id === next.id ? { ...task, status: 'review', output: proposals[(task.id - 1) % 3] } : task))
-    setMessage(`已按 ${next.capability} 路由生成本地候选，等待人工审核。`)
+    setMessage(`已按 ${next.capability} 路由执行：请求 ${next.requestedStrategy}，实际 local-template，等待人工审核。`)
   }
 
   function review(id: number, status: 'approved' | 'rejected') {
@@ -76,6 +78,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <textarea id="production-brief" value={brief} onChange={e => setBrief(e.target.value)} maxLength={1200} rows={3} />
     <div className="theme-interpreter"><span>Theme Interpreter · local</span><strong>{interpretedSpec.label}</strong><small>允许覆盖 {interpretedSpec.allowedSlots.length} 类；锁定 {interpretedSpec.blockedFields.length} 项城市结构。</small></div>
     {themeCandidate && <div className="theme-preview"><div><span>ThemeSpec Preview</span><strong>{themeSpecs[themeCandidate].label}</strong></div><small>Version {themeCandidate}-local-01 · 不修改 StableCity</small><div className="theme-preview-grid"><span>允许：{themeSpecs[themeCandidate].allowedSlots.join(' · ')}</span><span>锁定：{themeSpecs[themeCandidate].blockedFields.join(' · ')}</span></div>{themeCandidateStatus === 'preview' && <div className="task-actions"><button className="primary" onClick={confirmThemeCandidate}>确认 ThemeVersion</button><button onClick={rejectThemeCandidate}>退回</button></div>}{themeCandidateStatus === 'confirmed' && <p className="result" role="status">已确认候选，等待后续生成策略。</p>}{themeCandidateStatus === 'rejected' && <p className="result" role="status">候选已退回。</p>}</div>}
+    <label className="strategy-select" htmlFor="requested-strategy"><span>Requested strategy</span><select id="requested-strategy" value={requestedStrategy} onChange={e => setRequestedStrategy(e.target.value as RequestedStrategy)}><option value="auto">Auto · 自动路由</option><option value="direct-api">Direct API · 直连</option><option value="codex">Codex · 工程执行</option><option value="hybrid">Hybrid · 混合流程</option></select><small>当前 Provider 未连接，实际执行保持 local-template。</small></label>
     <div className="task-actions">
       <button className="primary" disabled={!brief.trim()} onClick={splitBrief}>拆分并加入队列</button>
       <button disabled={!tasks.some(task => task.status === 'queued')} onClick={runNext}>运行下一项</button>
@@ -83,7 +86,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
       <div className="task-heading"><h4>{String(task.id).padStart(2, '0')} · {task.name}</h4><span>{statusLabels[task.status]}</span></div>
-      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>{task.strategy}</span><span>provider:{task.provider}</span></div>
+      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>request:{task.requestedStrategy}</span><span>exec:{task.strategy}</span><span>provider:{task.provider}</span></div>
       <details><summary>输入快照</summary><p>{task.input}</p></details>
       {task.output && <p className="candidate">{task.output}</p>}
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
