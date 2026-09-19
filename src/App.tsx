@@ -68,11 +68,12 @@ function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
   return null
 }
 
-function Scene({ time, mode, theme, enabled, onUpdate }: {
+function Scene({ time, mode, theme, enabled, onUpdate, onReady }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   onUpdate: (metrics: RenderMetrics) => void
+  onReady: () => void
 }) {
-  return <Canvas shadows dpr={[1, 1.5]} gl={{ antialias: true }}>
+  return <Canvas shadows dpr={[1, 1.5]} gl={{ antialias: true }} onCreated={() => requestAnimationFrame(onReady)}>
     <PerspectiveCamera makeDefault fov={46} />
     <CameraDirector mode={mode} />
     <City time={time} theme={theme} enabled={enabled} />
@@ -93,6 +94,7 @@ export function App() {
   const [enabled, setEnabled] = useState(true)
   const [panel, setPanel] = useState<'monitor' | 'quality' | 'debug'>('monitor')
   const [metrics, setMetrics] = useState<RenderMetrics | null>(null)
+  const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
   const [checked, setChecked] = useState<string[]>([])
   useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
@@ -103,7 +105,7 @@ export function App() {
       <span className="project-status"><i />本地草稿 · Phase 1</span>
     </header>
     <div className="workspace">
-      <section className="scene-column" aria-label="城市预览">
+        <section className="scene-column" aria-label="城市预览">
         <div className="scene-toolbar">
           <div className="segmented" aria-label="镜头">
             <button aria-pressed={mode === 'overview'} onClick={() => setMode('overview')}>城市总览</button>
@@ -114,7 +116,11 @@ export function App() {
           </div>
         </div>
         <div className="viewport">
-          <Scene time={time} mode={mode} theme={theme} enabled={enabled} onUpdate={setMetrics} />
+          <Scene time={time} mode={mode} theme={theme} enabled={enabled} onUpdate={setMetrics} onReady={() => {
+            const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+            const start = navigation?.startTime ?? 0
+            setLoadMs(Math.round(performance.now() - start))
+          }} />
           <div className="scene-caption"><span>01 / ATLAS DISTRICT</span><strong>{mode === 'overview' ? '秩序之中的城市' : '穿越城市的门'}</strong><small>拖动旋转 · 滚轮缩放</small></div>
         </div>
         <div className="scene-status">
@@ -144,7 +150,7 @@ export function App() {
           {panel === 'quality' && <>
             <div className="section-heading"><h3>Quality</h3><span>LIVE SNAPSHOT</span></div>
             <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
-            <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div></div>
+            <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
             <button className="primary" onClick={() => setQcResult(JSON.stringify(city) === baseline && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
             <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? '通过：城市数据与基准一致，16 街区 / 60 建筑。' : '未通过：城市数据发生变化。'}</p>
