@@ -27,6 +27,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   const [themeCandidateStatus, setThemeCandidateStatus] = useState<'preview' | 'confirmed' | 'rejected' | null>(null)
   const interpretedTheme = interpretThemeBrief(brief)
   const interpretedSpec = themeSpecs[interpretedTheme]
+  const statusCounts = tasks.reduce<Record<Task['status'], number>>((counts, task) => { counts[task.status] += 1; return counts }, { queued: 0, review: 0, approved: 0, rejected: 0 })
 
   function logEvent(label: string) {
     setEvents(prev => [...prev, { id: prev.length + 1, label }].slice(-8))
@@ -113,6 +114,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       <button disabled={!tasks.length || tasks.some(task => task.status !== 'approved')} onClick={finalizeBatch}>完成本次制作</button>
     </div>
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
+    <div className="task-summary"><span>queued <b>{statusCounts.queued}</b></span><span>review <b>{statusCounts.review}</b></span><span>approved <b>{statusCounts.approved}</b></span><span>rejected <b>{statusCounts.rejected}</b></span><span>cost <b>$0.00</b></span></div>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
       <div className="task-heading"><h4>{String(task.id).padStart(2, '0')} · {task.name}</h4><span>{statusLabels[task.status]}</span></div>
       <div className="task-meta"><span>{task.themeVersion}</span><span>{task.capability}</span><span>request:{task.requestedStrategy}</span><span>exec:{task.strategy}</span><span>provider:{task.provider}</span></div>
