@@ -73,6 +73,12 @@ input[type="checkbox"] { width: 17px; height: 17px; flex: none; accent-color: va
 .theme-interpreter span { font-family: Consolas, monospace; text-transform: uppercase; }
 .theme-interpreter strong { color: #e4c392; font-size: 12px; }
 .theme-interpreter small { grid-column: 1 / -1; }
+.theme-preview { margin: 10px 0 12px; padding: 10px; border: 1px solid #53664f; border-radius: 5px; background: #24352f; }
+.theme-preview > div:first-child { display: flex; justify-content: space-between; gap: 10px; }
+.theme-preview span, .theme-preview small { color: var(--muted); font-size: 10px; }
+.theme-preview strong { color: #e8c48f; font-size: 12px; }
+.theme-preview-grid { display: grid; gap: 4px; margin-top: 8px; line-height: 1.6; }
+.theme-preview-grid span { color: #c8d4cd; font-size: 10px; }
 textarea { display: block; width: 100%; resize: vertical; min-height: 80px; max-height: 200px; background: #111e24; border: 1px solid #41545c; color: #dbe2dc; border-radius: 5px; padding: 10px; font-size: 12px; line-height: 1.8; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .monitor-task { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 22px; }
