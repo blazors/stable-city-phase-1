@@ -240,6 +240,22 @@ summary { cursor: pointer; }
 .comparison-frame span { color: #afc0ba; font: 9px Consolas, monospace; letter-spacing: 1px; }
 .comparison-frame strong { margin-top: 28px; color: #e4d4bb; font-size: 12px; font-weight: 500; }
 .comparison-frame small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.quality-issue-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 15px; }
+.issue-marker { display: grid; grid-template-columns: 20px 1fr; align-items: start; gap: 7px; min-width: 0; padding: 10px; text-align: left; background: #1a2b31; border: 1px solid #40565b; border-radius: 4px; }
+.issue-marker:hover:not(:disabled) { background: #21363c; border-color: #728888; }
+.issue-marker > span { color: #829694; font: 9px Consolas, monospace; }
+.issue-marker strong, .issue-marker small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue-marker strong { color: #d4dfd8; font-size: 10px; font-weight: 500; }
+.issue-marker small { margin-top: 5px; color: #d98f78; font: 8px Consolas, monospace; }
+.issue-marker.confirmed { border-color: #657950; background: #24352f; }
+.issue-marker.confirmed small { color: #b8d59c; }
+.iteration-history { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 17px; padding: 10px 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.iteration-history > span { color: var(--muted); font: 9px Consolas, monospace; letter-spacing: 1px; }
+.iteration-history > div { display: grid; gap: 3px; padding: 5px 8px; background: #1a2b31; border: 1px solid #334a50; border-radius: 3px; }
+.iteration-history > div.current { border-color: #657950; background: #24352f; }
+.iteration-history b { color: #e4c392; font: 10px Consolas, monospace; font-weight: 500; }
+.iteration-history small { color: var(--muted); font-size: 9px; }
+.iteration-history i { color: #7f9592; font-style: normal; }
 .quality-actions { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; }
 .quality-details { flex: 1 1 100%; margin-top: 5px; border-top: 1px solid var(--line); padding-top: 14px; }
 .quality-details > summary { color: #d8c29d; font-size: 11px; }
@@ -326,6 +342,7 @@ summary { cursor: pointer; }
   .view-surface { padding: 22px 16px 28px; }
   .context-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .asset-gallery, .intelligence-page .intelligence-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quality-issue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .debug-layout { grid-template-columns: 1fr; gap: 14px; }
   .pipeline-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
