@@ -93,6 +93,12 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     logEvent(`requeue · task:${id}`)
   }
 
+  function finalizeBatch() {
+    if (!tasks.length || tasks.some(task => task.status !== 'approved')) return
+    setMessage('本次制作批次已完成并留档；结果尚未应用到场景。')
+    logEvent(`finalize · ${tasks.length} tasks approved · scene unchanged`)
+  }
+
   return <>
     <h3>拆分制作任务</h3>
     <p className="help">本地模板演练：拆分 → 生成说明 → 人工审核。结果不会自动修改城市，刷新后清空。</p>
@@ -104,6 +110,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <div className="task-actions">
       <button className="primary" disabled={!brief.trim()} onClick={splitBrief}>拆分并加入队列</button>
       <button disabled={!tasks.some(task => task.status === 'queued') || themeCandidateStatus !== 'confirmed'} onClick={runNext}>运行下一项</button>
+      <button disabled={!tasks.length || tasks.some(task => task.status !== 'approved')} onClick={finalizeBatch}>完成本次制作</button>
     </div>
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
