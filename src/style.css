@@ -96,6 +96,11 @@ textarea { display: block; width: 100%; resize: vertical; min-height: 80px; max-
 .debug-list { margin: 16px 0 24px; }
 .debug-list > div span { color: var(--muted); }
 .debug-list > div b { color: #d8c29d; font: 10px Consolas, monospace; font-weight: 400; text-align: right; }
+.provider-matrix { display: grid; gap: 7px; margin: 10px 0 18px; }
+.provider-matrix div { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 8px 9px; background: #17282e; border: 1px solid #2f464d; border-radius: 4px; }
+.provider-matrix span, .provider-matrix small { color: var(--muted); font-size: 10px; }
+.provider-matrix b { color: #e4c392; font-size: 11px; font-weight: 500; }
+.provider-matrix small { grid-column: 1 / -1; }
 pre, .log { margin: 12px 0 22px; overflow-x: auto; background: #111e24; border: 1px solid #35494f; border-radius: 5px; padding: 12px; color: #b8c9bd; font: 10px/1.7 Consolas, monospace; }
 .log { display: grid; gap: 7px; color: #9db2af; }
 .task-actions button { font-size: 11px; padding: 8px; }
