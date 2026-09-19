@@ -96,8 +96,11 @@ export function App() {
   const [metrics, setMetrics] = useState<RenderMetrics | null>(null)
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
+  const [themeOffResult, setThemeOffResult] = useState<boolean | null>(null)
   const [checked, setChecked] = useState<string[]>([])
   useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
+  useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
+  useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
 
   return <main>
     <header className="app-header">
@@ -154,6 +157,9 @@ export function App() {
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
             <button className="primary" onClick={() => setQcResult(getStableCitySignature(city) === baselineSignature && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
             <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : '未通过：StableCity 签名发生变化。'}</p>
+            <h3>Theme OFF Test</h3><p className="help">关闭主题覆盖，确认主题不会改写 StableCity 基线。</p>
+            <button className="primary" onClick={() => { setEnabled(false); setThemeOffResult(getStableCitySignature(city) === baselineSignature) }}>运行 Theme OFF Test</button>
+            <p className="result" role="status">{themeOffResult === null ? '尚未检查' : themeOffResult ? '通过：主题关闭后 StableCity 签名保持一致。' : '未通过：主题关闭后结构发生变化。'}</p>
             <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
