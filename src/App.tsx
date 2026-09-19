@@ -93,18 +93,21 @@ export function App() {
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
   const [themeOffResult, setThemeOffResult] = useState<boolean | null>(null)
-  const [themeMatrixResult, setThemeMatrixResult] = useState<Record<ThemeName, boolean> | null>(null)
+  const [themeMatrixResult, setThemeMatrixResult] = useState<Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }> | null>(null)
   const [reportMessage, setReportMessage] = useState('')
   const [checked, setChecked] = useState<string[]>([])
   useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
   useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
   useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
   useEffect(() => { setThemeMatrixResult(null) }, [time, mode])
-  const themeMatrixPass = themeMatrixResult !== null && Object.values(themeMatrixResult).every(Boolean)
+  const themeMatrixPass = themeMatrixResult !== null && Object.values(themeMatrixResult).every(result => result.stableCity && result.themeSpecDistinct)
   const qualityGate = qcResult === true && themeOffResult === true && themeMatrixPass && checked.length === visualChecks.length && metrics !== null && loadMs !== null
 
   function runThemeMatrixTest() {
-    const result = Object.fromEntries((Object.keys(themes) as ThemeName[]).map(name => [name, getStableCitySignature(city) === baselineSignature])) as Record<ThemeName, boolean>
+    const names = Object.keys(themes) as ThemeName[]
+    const visualSignatures = new Set(names.map(name => [themes[name].primary, themes[name].accent, themes[name].atmosphere].join('|')))
+    const themeSpecDistinct = visualSignatures.size === names.length
+    const result = Object.fromEntries(names.map(name => [name, { stableCity: getStableCitySignature(city) === baselineSignature, themeSpecDistinct }])) as Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }>
     setThemeMatrixResult(result)
   }
 
@@ -194,7 +197,7 @@ export function App() {
             <p className="result" role="status">{themeOffResult === null ? '尚未检查' : themeOffResult ? '通过：主题关闭后 StableCity 签名保持一致。' : '未通过：主题关闭后结构发生变化。'}</p>
             <h3>Theme Matrix Test</h3><p className="help">遍历三个 ThemeSpec，确认同一 CitySeed 的 StableCity 签名保持一致。</p>
             <button className="primary" onClick={runThemeMatrixTest}>运行 Theme Matrix Test</button>
-            <p className="result" role="status">{themeMatrixResult === null ? '尚未检查' : themeMatrixPass ? '通过：Harbor / Verdant / Ember 均保持同一 StableCity 签名。' : `未通过：${Object.entries(themeMatrixResult).filter(([, pass]) => !pass).map(([name]) => name).join('、')} 出现结构差异。`}</p>
+            <p className="result" role="status">{themeMatrixResult === null ? '尚未检查' : themeMatrixPass ? '通过：StableCity 签名一致，三个 ThemeSpec 保持可区分。' : `未通过：${Object.entries(themeMatrixResult).filter(([, result]) => !result.stableCity || !result.themeSpecDistinct).map(([name]) => name).join('、')} 存在结构或主题差异问题。`}</p>
             <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
