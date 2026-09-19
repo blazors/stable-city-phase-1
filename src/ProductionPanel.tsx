@@ -15,16 +15,22 @@ type Task = {
   status: 'queued' | 'review' | 'approved' | 'rejected'
 }
 const statusLabels = { queued: '待运行', review: '待审核', approved: '已批准', rejected: '已退回' }
+type RunEvent = { id: number; label: string }
 
 export function ProductionPanel({ seed, theme }: { seed: number; theme: string }) {
   const [brief, setBrief] = useState('完善立面节奏、交通尺度参照和环境色层次。')
   const [tasks, setTasks] = useState<Task[]>([])
   const [message, setMessage] = useState('')
+  const [events, setEvents] = useState<RunEvent[]>([])
   const [requestedStrategy, setRequestedStrategy] = useState<RequestedStrategy>('auto')
   const [themeCandidate, setThemeCandidate] = useState<ThemeName | null>(null)
   const [themeCandidateStatus, setThemeCandidateStatus] = useState<'preview' | 'confirmed' | 'rejected' | null>(null)
   const interpretedTheme = interpretThemeBrief(brief)
   const interpretedSpec = themeSpecs[interpretedTheme]
+
+  function logEvent(label: string) {
+    setEvents(prev => [...prev, { id: prev.length + 1, label }].slice(-8))
+  }
 
   function splitBrief() {
     const input = brief.trim()
@@ -41,17 +47,20 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       status: 'queued',
     }))])
     setMessage(`已按固定模板加入 3 项任务；Theme Interpreter 识别为 ${interpretedSpec.label}。此拆分未调用 AI。`)
+    logEvent(`split · 3 tasks · ${interpretedTheme}-local-01 · request:${requestedStrategy}`)
   }
 
   function confirmThemeCandidate() {
     if (!themeCandidate) return
     setThemeCandidateStatus('confirmed')
     setMessage(`ThemeVersion ${themeCandidate}-local-01 已确认并留档；尚未应用到场景。`)
+    logEvent(`theme.confirm · ${themeCandidate}-local-01 · StableCity unchanged`)
   }
 
   function rejectThemeCandidate() {
     setThemeCandidateStatus('rejected')
     setMessage('ThemeSpec 候选已退回，可修改制作要求后重新拆分。')
+    logEvent(`theme.reject · ${themeCandidate}-local-01`)
   }
 
   function runNext() {
@@ -64,11 +73,19 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     ]
     setTasks(prev => prev.map(task => task.id === next.id ? { ...task, status: 'review', output: proposals[(task.id - 1) % 3] } : task))
     setMessage(`已按 ${next.capability} 路由执行：请求 ${next.requestedStrategy}，实际 local-template，等待人工审核。`)
+    logEvent(`run · task:${next.id} · ${next.capability} · ${next.requestedStrategy}→local-template`)
   }
 
   function review(id: number, status: 'approved' | 'rejected') {
     setTasks(prev => prev.map(task => task.id === id && task.status === 'review' ? { ...task, status } : task))
     setMessage(status === 'approved' ? '候选已批准并留档于本次会话；尚未应用到场景。' : '候选已退回，可重新运行模板。')
+    logEvent(`${status === 'approved' ? 'review.approve' : 'review.reject'} · task:${id}`)
+  }
+
+  function requeue(id: number) {
+    setTasks(prev => prev.map(item => item.id === id ? { ...item, status: 'queued', output: '' } : item))
+    setMessage('任务已重新入队。')
+    logEvent(`requeue · task:${id}`)
   }
 
   return <>
@@ -78,7 +95,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <textarea id="production-brief" value={brief} onChange={e => setBrief(e.target.value)} maxLength={1200} rows={3} />
     <div className="theme-interpreter"><span>Theme Interpreter · local</span><strong>{interpretedSpec.label}</strong><small>允许覆盖 {interpretedSpec.allowedSlots.length} 类；锁定 {interpretedSpec.blockedFields.length} 项城市结构。</small></div>
     {themeCandidate && <div className="theme-preview"><div><span>ThemeSpec Preview</span><strong>{themeSpecs[themeCandidate].label}</strong></div><small>Version {themeCandidate}-local-01 · 不修改 StableCity</small><div className="theme-preview-grid"><span>允许：{themeSpecs[themeCandidate].allowedSlots.join(' · ')}</span><span>锁定：{themeSpecs[themeCandidate].blockedFields.join(' · ')}</span></div>{themeCandidateStatus === 'preview' && <div className="task-actions"><button className="primary" onClick={confirmThemeCandidate}>确认 ThemeVersion</button><button onClick={rejectThemeCandidate}>退回</button></div>}{themeCandidateStatus === 'confirmed' && <p className="result" role="status">已确认候选，等待后续生成策略。</p>}{themeCandidateStatus === 'rejected' && <p className="result" role="status">候选已退回。</p>}</div>}
-    <label className="strategy-select" htmlFor="requested-strategy"><span>Requested strategy</span><select id="requested-strategy" value={requestedStrategy} onChange={e => setRequestedStrategy(e.target.value as RequestedStrategy)}><option value="auto">Auto · 自动路由</option><option value="direct-api">Direct API · 直连</option><option value="codex">Codex · 工程执行</option><option value="hybrid">Hybrid · 混合流程</option></select><small>当前 Provider 未连接，实际执行保持 local-template。</small></label>
+    <label className="strategy-select" htmlFor="requested-strategy"><span>Requested strategy</span><select id="requested-strategy" value={requestedStrategy} onChange={e => { const next = e.target.value as RequestedStrategy; setRequestedStrategy(next); logEvent(`strategy.select · ${next}`) }}><option value="auto">Auto · 自动路由</option><option value="direct-api">Direct API · 直连</option><option value="codex">Codex · 工程执行</option><option value="hybrid">Hybrid · 混合流程</option></select><small>当前 Provider 未连接，实际执行保持 local-template。</small></label>
     <div className="task-actions">
       <button className="primary" disabled={!brief.trim()} onClick={splitBrief}>拆分并加入队列</button>
       <button disabled={!tasks.some(task => task.status === 'queued')} onClick={runNext}>运行下一项</button>
@@ -90,7 +107,9 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       <details><summary>输入快照</summary><p>{task.input}</p></details>
       {task.output && <p className="candidate">{task.output}</p>}
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
-      {task.status === 'rejected' && <button onClick={() => setTasks(prev => prev.map(item => item.id === task.id ? { ...item, status: 'queued', output: '' } : item))}>重新入队</button>}
+      {task.status === 'rejected' && <button onClick={() => requeue(task.id)}>重新入队</button>}
     </article>)}</div>
+    <h3>Run Log</h3>
+    <div className="run-log" role="log" aria-live="polite">{events.length ? events.map(event => <span key={event.id}>{String(event.id).padStart(2, '0')} · {event.label}</span>) : <span>尚无运行事件。</span>}</div>
   </>
 }
