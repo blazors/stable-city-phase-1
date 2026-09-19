@@ -4,7 +4,7 @@ export type Block = { id: string; x: number; z: number; kind: 'urban' | 'void' |
 export type Parcel = { id: string; blockId: string; buildingId: string; x: number; z: number; width: number; depth: number; density: 'core' | 'edge' }
 export type UrbanGrammar = { primaryAxis: 'north-south'; secondaryRoads: number; localStreets: number; publicVoids: number; densityBands: Array<'core' | 'edge'> }
 export type TransportGraph = { mainSpine: 'east-west'; elevatedRail: boolean; stationCount: number }
-export type StableCity = { seed: number; blocks: Block[]; buildings: Building[]; parcels: Parcel[]; urbanGrammar: UrbanGrammar; transport: TransportGraph; signature: string }
+export type StableCity = { seed: number; blocks: Block[]; buildings: Building[]; parcels: Parcel[]; urbanGrammar: UrbanGrammar; transport: TransportGraph; heroBlock: string; secondaryPeaks: string[]; publicVoids: string[]; signature: string }
 type StableCityData = Omit<StableCity, 'signature'>
 
 export function getStableCitySignature(city: StableCityData): string {
@@ -48,6 +48,7 @@ export function createStableCity(seed = 240319): StableCity {
   }
   const urbanGrammar: UrbanGrammar = { primaryAxis: 'north-south', secondaryRoads: 4, localStreets: 16, publicVoids: blocks.filter(block => block.kind === 'void').length, densityBands: ['core', 'edge'] }
   const transport: TransportGraph = { mainSpine: 'east-west', elevatedRail: true, stationCount: 1 }
-  const stableCity = { seed, blocks, buildings, parcels, urbanGrammar, transport }
+  const publicVoids = blocks.filter(block => block.kind === 'void').map(block => block.id)
+  const stableCity = { seed, blocks, buildings, parcels, urbanGrammar, transport, heroBlock: '1:2', secondaryPeaks: ['0:3', '3:0'], publicVoids }
   return { ...stableCity, signature: getStableCitySignature(stableCity) }
 }
