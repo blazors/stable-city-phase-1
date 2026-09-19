@@ -67,9 +67,10 @@ function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
 function Scene({ time, mode, theme, enabled, onUpdate, onReady }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   onUpdate: (metrics: RenderMetrics) => void
-  onReady: () => void
+  onReady: (loadMs: number) => void
 }) {
-  return <Canvas shadows dpr={[1, 1.5]} gl={{ antialias: true }} onCreated={() => requestAnimationFrame(onReady)}>
+  const sceneStartedAt = useRef(performance.now())
+  return <Canvas shadows dpr={[1, 1.5]} gl={{ antialias: true }} onCreated={() => requestAnimationFrame(() => onReady(Math.round(performance.now() - sceneStartedAt.current)))}>
     <PerspectiveCamera makeDefault fov={46} />
     <CameraDirector mode={mode} />
     <City time={time} theme={theme} enabled={enabled} />
@@ -129,6 +130,7 @@ export function App() {
       timeOfDay: time,
       camera: mode,
       metrics: metrics ? { ...metrics, loadMs } : { loadMs },
+      loadMeasurement: 'Canvas initialization to first animation frame',
       structureCheck: qcResult,
       structureIssues: qcIssues,
       themeOffTest: themeOffResult,
@@ -167,11 +169,7 @@ export function App() {
           </div>
         </div>
         <div className="viewport">
-          <Scene time={time} mode={mode} theme={theme} enabled={enabled} onUpdate={setMetrics} onReady={() => {
-            const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-            const start = navigation?.startTime ?? 0
-            setLoadMs(Math.round(performance.now() - start))
-          }} />
+          <Scene time={time} mode={mode} theme={theme} enabled={enabled} onUpdate={setMetrics} onReady={setLoadMs} />
           <div className="scene-caption"><span>01 / ATLAS DISTRICT</span><strong>{mode === 'overview' ? '秩序之中的城市' : '穿越城市的门'}</strong><small>拖动旋转 · 滚轮缩放</small></div>
         </div>
         <div className="scene-status">
