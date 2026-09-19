@@ -83,13 +83,25 @@ const baselineSignature = city.signature
 const timeLabels = { day: '白昼', sunset: '日落', night: '夜晚' }
 const themeLabels = { harbor: '矿石港湾', verdant: '绿洲中继', ember: '余烬铸城' }
 const visualChecks = ['明暗与色彩层级', '巨构主角与剪影', '空间纵深与材质', '关闭主题后的可读性']
+type ConsoleMode = 'monitor' | 'quality' | 'debug'
+type Decision = { id: string; title: string; detail: string }
+const defaultDecisions: Decision[] = [
+  { id: '3d-api', title: '3D API 调用批准', detail: 'Provider 尚未连接，当前保持 procedural only。' },
+  { id: 'hero-regenerate', title: 'Hero Regenerate', detail: '等待 GPT-6 Astra 完成高级视觉复核后再允许。' },
+]
 
 export function App() {
   const [time, setTime] = useState<TimeOfDay>('sunset')
   const [mode, setMode] = useState<'overview' | 'mega'>('overview')
   const [theme, setTheme] = useState<ThemeName>('harbor')
   const [enabled, setEnabled] = useState(true)
-  const [panel, setPanel] = useState<'monitor' | 'quality' | 'debug'>('monitor')
+  const [consoleMode, setConsoleMode] = useState<ConsoleMode>('monitor')
+  const [qualityMode, setQualityMode] = useState<'quality' | 'cost'>('quality')
+  const [debugMode, setDebugMode] = useState<'debug' | 'intelligence'>('debug')
+  const [decisionDrawerOpen, setDecisionDrawerOpen] = useState(false)
+  const [decisions, setDecisions] = useState<Decision[]>(defaultDecisions)
+  const runStartedAt = useRef(performance.now())
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [metrics, setMetrics] = useState<RenderMetrics | null>(null)
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
@@ -98,12 +110,22 @@ export function App() {
   const [themeMatrixResult, setThemeMatrixResult] = useState<Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }> | null>(null)
   const [reportMessage, setReportMessage] = useState('')
   const [checked, setChecked] = useState<string[]>([])
+  useEffect(() => {
+    const interval = window.setInterval(() => setElapsedSeconds(Math.floor((performance.now() - runStartedAt.current) / 1000)), 1000)
+    return () => window.clearInterval(interval)
+  }, [])
   useEffect(() => { setChecked([]); setQcResult(null); setQcIssues([]) }, [time, mode, theme, enabled])
   useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
   useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
   useEffect(() => { setThemeMatrixResult(null) }, [time, mode])
   const themeMatrixPass = themeMatrixResult !== null && Object.values(themeMatrixResult).every(result => result.stableCity && result.themeSpecDistinct)
   const qualityGate = qcResult === true && themeOffResult === true && themeMatrixPass && checked.length === visualChecks.length && metrics !== null && loadMs !== null
+  const elapsedLabel = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+  const runStatus = decisions.length ? 'ATTENTION' : metrics ? 'LIVE' : 'BOOTING'
+
+  function dismissDecision(id: string) {
+    setDecisions(prev => prev.filter(decision => decision.id !== id))
+  }
 
   function runThemeMatrixTest() {
     const names = Object.keys(themes) as ThemeName[]
@@ -191,61 +213,84 @@ export function App() {
         </div>
       </section>
       <aside className="console" aria-label="制作控制台">
-        <div className="console-title"><p className="eyebrow">PRODUCTION CONSOLE</p><h2>场景工作台</h2><p>从城市骨架，到完整的世界。</p></div>
-        <nav className="panel-tabs" aria-label="控制台">
-          {(['monitor', 'quality', 'debug'] as const).map((item, i) => <button key={item} aria-pressed={panel === item} onClick={() => setPanel(item)}>{['运行监视', '质量与成本', '调试与洞察'][i]}</button>)}
+        <div className="console-title"><p className="eyebrow">PRODUCTION CONSOLE</p><h2>场景工作台</h2><p>一个 Run，上下文始终保持。</p></div>
+        <div className="run-context" aria-label="Run Context Bar">
+          <div className="context-heading"><span>RUN CONTEXT</span><b>{runStatus}</b></div>
+          <div className="context-grid">
+            <div><span>Run ID</span><strong>RUN-{city.seed}-P1</strong></div>
+            <div><span>CitySeed</span><strong>{city.seed}</strong></div>
+            <label><span>ThemeVersion</span><select value={theme} onChange={e => setTheme(e.target.value as ThemeName)}>{(Object.keys(themes) as ThemeName[]).map(name => <option key={name} value={name}>{name}-local-01</option>)}</select></label>
+            <div><span>Cost</span><strong>$0.00</strong></div>
+            <div><span>Elapsed</span><strong>{elapsedLabel}</strong></div>
+          </div>
+          <div className="context-actions"><label className="context-toggle"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /><span>Theme overlay</span></label><button className="decision-trigger" onClick={() => setDecisionDrawerOpen(true)}>⚠ {decisions.length} Decisions Required</button></div>
+        </div>
+        <nav className="workspace-modes" aria-label="工作模式">
+          <button className={consoleMode === 'monitor' ? 'active' : ''} onClick={() => setConsoleMode('monitor')}><span>Monitor</span><small>LIVE</small></button>
+          <button className={consoleMode === 'quality' ? 'active' : ''} onClick={() => setConsoleMode('quality')}><span>Quality &amp; Cost</span><small>ANALYZE</small></button>
+          <button className={consoleMode === 'debug' ? 'active' : ''} onClick={() => setConsoleMode('debug')}><span>Debug &amp; Intelligence</span><small>INSPECT</small></button>
         </nav>
         <div className="panel-body">
-          {panel === 'monitor' && <>
-            <div className="section-heading"><h3>选择氛围</h3><span>03 PRESETS</span></div>
-            <p className="help">调整材质配色与环境色，城市布局保持固定。</p>
-            <div className="theme-list">{(Object.keys(themes) as ThemeName[]).map((name, i) =>
-              <button key={name} className={`theme-choice ${name}`} aria-pressed={theme === name} onClick={() => setTheme(name)}>
-                <span className="theme-swatch" aria-hidden="true"><i /><i /><i /></span>
-                <span><strong>{themeLabels[name]}</strong><small>{themes[name].label}</small></span><b>0{i + 1}</b>
-              </button>)}
+          {consoleMode === 'monitor' && <>
+            <div className="mode-heading"><div><span>MONITOR</span><h3>实时制作管线</h3></div><b>LIVE</b></div>
+            <p className="help">只显示当前 Run 的步骤、执行策略、阻塞与决定状态。</p>
+            <div className="pipeline-list">
+              <div className="pipeline-step"><i>01</i><div><strong>StableCity assembled</strong><small>{city.blocks.length} blocks · {city.buildings.length} buildings · signature locked</small></div><b className="step-done">READY</b></div>
+              <div className="pipeline-step"><i>02</i><div><strong>ThemeVersion {theme}-local-01</strong><small>{themes[theme].label} · overlay {enabled ? 'active' : 'off'}</small></div><b className="step-active">ACTIVE</b></div>
+              <div className="pipeline-step"><i>03</i><div><strong>Local production run</strong><small>Procedural + local mock · no external provider</small></div><b>READY</b></div>
+              <div className="pipeline-step"><i>04</i><div><strong>Human decision gate</strong><small>{decisions.length ? `${decisions.length} decisions required` : 'No pending decisions'}</small></div><b className={decisions.length ? 'step-blocked' : 'step-done'}>{decisions.length ? 'BLOCKED' : 'CLEAR'}</b></div>
             </div>
-            <label className="toggle-row"><span>启用主题覆盖<small>关闭后对照基础港湾材质</small></span><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /></label>
-            <div className="note"><strong>结构锁定</strong><p>Seed、街区、建筑体量与巨构不会随主题重新生成。</p></div>
+            <div className="monitor-grid"><div><span>Current step</span><strong>{metrics ? 'Canvas rendered' : 'Canvas boot'}</strong></div><div><span>Execution Strategy</span><strong>local-template</strong></div><div><span>Provider</span><strong>none · fallback</strong></div><div><span>Decision</span><strong>{decisions.length ? `${decisions.length} required` : 'clear'}</strong></div></div>
+            <div className="blocker-row"><span>Error / Blocker</span><p>{decisions.length ? 'External provider approval is pending; no external call will run.' : 'None. Current Run can continue locally.'}</p></div>
+            <details className="pipeline-details"><summary>展开当前 Run 的制作控制</summary><div className="monitor-task"><ProductionPanel seed={city.seed} theme={themes[theme].label} /></div></details>
           </>}
-          {panel === 'monitor' && <div className="monitor-task"><ProductionPanel seed={city.seed} theme={themes[theme].label} /></div>}
-          {panel === 'quality' && <>
-            <div className="section-heading"><h3>Quality</h3><span>LIVE SNAPSHOT</span></div>
-            <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
-            <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
-            <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
-            <button className="primary" onClick={runStructureCheck}>运行结构检查</button>
-            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : `未通过：${qcIssues.join('、') || 'baseline'}。`}</p>
-            <h3>Theme OFF Test</h3><p className="help">关闭主题覆盖，确认主题不会改写 StableCity 基线。</p>
-            <button className="primary" onClick={() => { setEnabled(false); setThemeOffResult(getStableCitySignature(city) === baselineSignature) }}>运行 Theme OFF Test</button>
-            <p className="result" role="status">{themeOffResult === null ? '尚未检查' : themeOffResult ? '通过：主题关闭后 StableCity 签名保持一致。' : '未通过：主题关闭后结构发生变化。'}</p>
-            <h3>Theme Matrix Test</h3><p className="help">遍历三个 ThemeSpec，确认同一 CitySeed 的 StableCity 签名保持一致。</p>
-            <button className="primary" onClick={runThemeMatrixTest}>运行 Theme Matrix Test</button>
-            <p className="result" role="status">{themeMatrixResult === null ? '尚未检查' : themeMatrixPass ? '通过：StableCity 签名一致，三个 ThemeSpec 保持可区分。' : `未通过：${Object.entries(themeMatrixResult).filter(([, result]) => !result.stableCity || !result.themeSpecDistinct).map(([name]) => name).join('、')} 存在结构或主题差异问题。`}</p>
-            {themeMatrixResult && <div className="theme-matrix-results" aria-label="Theme Matrix 逐项结果">
-              {(Object.keys(themes) as ThemeName[]).map(name => {
-                const result = themeMatrixResult[name]
-                return <div key={name}><span>{themeLabels[name]}</span><b>{result.stableCity ? 'StableCity PASS' : 'StableCity FAIL'} · {result.themeSpecDistinct ? 'Spec DISTINCT' : 'Spec COLLISION'}</b></div>
-              })}
-            </div>}
-            <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
-            {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
-            <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
-            <div className="cost-row"><span>本地运行成本</span><b>$0.00</b></div>
-            <div className="quality-gate"><span>Quality Gate</span><b className={qualityGate ? 'pass' : 'incomplete'}>{qualityGate ? 'PASS' : 'INCOMPLETE'}</b></div>
-            <button className="primary" onClick={exportQualityReport}>导出 Quality Report</button>
-            {reportMessage && <p className="result" role="status">{reportMessage}</p>}
+          {consoleMode === 'quality' && <>
+            <div className="mode-heading"><div><span>QUALITY &amp; COST</span><h3>{qualityMode === 'quality' ? '质量验收' : '成本与调用'}</h3></div><b>ANALYZE</b></div>
+            <div className="submode-switch" aria-label="Quality and Cost"><button className={qualityMode === 'quality' ? 'active' : ''} onClick={() => setQualityMode('quality')}>Quality</button><button className={qualityMode === 'cost' ? 'active' : ''} onClick={() => setQualityMode('cost')}>Cost</button></div>
+            {qualityMode === 'quality' && <>
+              <p className="help">当前画面和 StableCity 基线的可验证指标。</p>
+              <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
+              <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
+              <button className="primary" onClick={runStructureCheck}>运行结构检查</button>
+              <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : `未通过：${qcIssues.join('、') || 'baseline'}。`}</p>
+              <h3>Theme OFF Test</h3><p className="help">关闭主题覆盖，确认主题不会改写 StableCity 基线。</p>
+              <button className="primary" onClick={() => { setEnabled(false); setThemeOffResult(getStableCitySignature(city) === baselineSignature) }}>运行 Theme OFF Test</button>
+              <p className="result" role="status">{themeOffResult === null ? '尚未检查' : themeOffResult ? '通过：主题关闭后 StableCity 签名保持一致。' : '未通过：主题关闭后结构发生变化。'}</p>
+              <h3>Theme Matrix Test</h3><p className="help">遍历三个 ThemeSpec，确认同一 CitySeed 的 StableCity 签名保持一致。</p>
+              <button className="primary" onClick={runThemeMatrixTest}>运行 Theme Matrix Test</button>
+              <p className="result" role="status">{themeMatrixResult === null ? '尚未检查' : themeMatrixPass ? '通过：StableCity 签名一致，三个 ThemeSpec 保持可区分。' : `未通过：${Object.entries(themeMatrixResult).filter(([, result]) => !result.stableCity || !result.themeSpecDistinct).map(([name]) => name).join('、')} 存在结构或主题差异问题。`}</p>
+              {themeMatrixResult && <div className="theme-matrix-results" aria-label="Theme Matrix 逐项结果">{(Object.keys(themes) as ThemeName[]).map(name => { const result = themeMatrixResult[name]; return <div key={name}><span>{themeLabels[name]}</span><b>{result.stableCity ? 'StableCity PASS' : 'StableCity FAIL'} · {result.themeSpecDistinct ? 'Spec DISTINCT' : 'Spec COLLISION'}</b></div> })}</div>}
+              <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
+              {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
+              <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
+              <div className="quality-gate"><span>Quality Gate</span><b className={qualityGate ? 'pass' : 'incomplete'}>{qualityGate ? 'PASS' : 'INCOMPLETE'}</b></div>
+              <button className="primary" onClick={exportQualityReport}>导出 Quality Report</button>
+              {reportMessage && <p className="result" role="status">{reportMessage}</p>}
+            </>}
+            {qualityMode === 'cost' && <>
+              <p className="help">当前只统计本地执行；未连接的模型或 API 不伪造调用量。</p>
+              <div className="cost-overview"><div><span>Total Cost</span><strong>$0.00</strong><small>local fallback only</small></div><div><span>Token</span><strong>未调用</strong><small>no model request</small></div><div><span>Elapsed</span><strong>{elapsedLabel}</strong><small>current Run</small></div></div>
+              <div className="cost-list"><div><span>Model calls</span><b>0 · 未调用</b></div><div><span>Image API</span><b>0 · 未调用</b></div><div><span>3D API</span><b>0 · 未调用</b></div><div><span>Codex Run</span><b>0 · 未调用</b></div><div><span>Canvas init</span><b>{loadMs === null ? '—' : `${loadMs} ms`}</b></div><div><span>Current frame</span><b>{metrics === null ? '—' : `${metrics.frameMs.toFixed(1)} ms`}</b></div></div>
+            </>}
           </>}
-          {panel === 'debug' && <>
-            <div className="section-heading"><h3>Debug</h3><span>READ ONLY</span></div>
-            <p className="help">查看本次场景装配的输入、策略与限制。</p>
-            <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>UrbanGrammar</span><b>{city.urbanGrammar.primaryAxis} / {city.urbanGrammar.secondaryRoads} secondary</b></div><div><span>Street + Parcels</span><b>{city.urbanGrammar.localStreets} local / {city.parcels.length} parcels</b></div><div><span>DensityBands</span><b>{city.urbanGrammar.densityBands.join(' / ')} / voids {city.urbanGrammar.publicVoids}</b></div><div><span>Composition</span><b>hero {city.heroBlock} / peaks {city.secondaryPeaks.length} / voids {city.publicVoids.length}</b></div><div><span>Transport</span><b>{city.transport.mainSpine} / rail {city.transport.elevatedRail ? 'on' : 'off'}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
-            <h3>Provider Matrix</h3>
-            <div className="provider-matrix"><div><span>Theme / schema</span><b>Luna · reserved</b><small>当前：local fallback</small></div><div><span>Engineering / routing</span><b>Terra / Codex · reserved</b><small>当前：local fallback</small></div><div><span>Hero / Mega art review</span><b>GPT-6 Astra · reserved</b><small>当前：未启用，等待高级视觉定稿</small></div><div><span>Image / 3D generation</span><b>Provider unavailable</b><small>当前：procedural only</small></div></div>
-            <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ ...themes[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked' }, null, 2)}</pre>
-            <h3>运行日志</h3><div className="log"><span>[scene] stable city assembled</span><span>[theme] overlay {enabled ? 'applied' : 'disabled'}</span><span>[qc] awaiting manual visual review</span></div>
+          {consoleMode === 'debug' && <>
+            <div className="mode-heading"><div><span>DEBUG &amp; INTELLIGENCE</span><h3>{debugMode === 'debug' ? '运行调试' : '智能洞察'}</h3></div><b>INSPECT</b></div>
+            <div className="submode-switch" aria-label="Debug and Intelligence"><button className={debugMode === 'debug' ? 'active' : ''} onClick={() => setDebugMode('debug')}>Debug</button><button className={debugMode === 'intelligence' ? 'active' : ''} onClick={() => setDebugMode('intelligence')}>Intelligence</button></div>
+            {debugMode === 'debug' && <>
+              <p className="help">查看本次场景装配的输入、策略与限制。</p>
+              <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>UrbanGrammar</span><b>{city.urbanGrammar.primaryAxis} / {city.urbanGrammar.secondaryRoads} secondary</b></div><div><span>Street + Parcels</span><b>{city.urbanGrammar.localStreets} local / {city.parcels.length} parcels</b></div><div><span>DensityBands</span><b>{city.urbanGrammar.densityBands.join(' / ')} / voids {city.urbanGrammar.publicVoids}</b></div><div><span>Composition</span><b>hero {city.heroBlock} / peaks {city.secondaryPeaks.length} / voids {city.publicVoids.length}</b></div><div><span>Transport</span><b>{city.transport.mainSpine} / rail {city.transport.elevatedRail ? 'on' : 'off'}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
+              <h3>Provider Matrix</h3><div className="provider-matrix"><div><span>Theme / schema</span><b>Luna · reserved</b><small>当前：local fallback</small></div><div><span>Engineering / routing</span><b>Terra / Codex · reserved</b><small>当前：local fallback</small></div><div><span>Hero / Mega art review</span><b>GPT-6 Astra · reserved</b><small>当前：未启用，等待高级视觉定稿</small></div><div><span>Image / 3D generation</span><b>Provider unavailable</b><small>当前：procedural only</small></div></div>
+              <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ ...themes[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked' }, null, 2)}</pre>
+              <h3>运行日志</h3><div className="log"><span>[scene] stable city assembled</span><span>[theme] overlay {enabled ? 'applied' : 'disabled'}</span><span>[qc] awaiting manual visual review</span></div>
+            </>}
+            {debugMode === 'intelligence' && <>
+              <p className="help">只显示有来源的本地观察；未调用真实模型时不推断 Provider 质量。</p>
+              <div className="intelligence-list"><article><span>Success patterns</span><strong>StableCity signature + Theme OFF 保持一致</strong><small>当前已通过本地结构校验；不是视觉模型评分。</small></article><article><span>Failure patterns</span><strong>{decisions.length ? 'External provider unavailable' : '暂无待处理阻塞'}</strong><small>阻塞来自当前连接状态，不代表生成质量。</small></article><article><span>Router suggestion</span><strong>继续使用 local-template</strong><small>等待 Luna / Terra / Astra 接入后再切换。</small></article><article><span>Provider performance</span><strong>未执行真实调用</strong><small>没有可报告的 token、延迟或成功率。</small></article><article><span>Prompt / Preset improvement</span><strong>下一轮优先校准 Hero silhouette 与 scale reference</strong><small>进入高级视觉阶段前需切换 GPT-6 Astra。</small></article></div>
+              <div className="flywheel"><span>Visual Intelligence Flywheel</span><b>Observe → QC → record → review</b><small>本 Run 已记录 StableCity、Theme Matrix、结构问题和本地指标。</small></div>
+            </>}
           </>}
         </div>
+        {decisionDrawerOpen && <div className="decision-drawer" role="dialog" aria-label="Decision Queue"><div className="drawer-heading"><div><span>DECISION QUEUE</span><h3>需处理的决定</h3></div><button onClick={() => setDecisionDrawerOpen(false)} aria-label="关闭决定面板">关闭</button></div><p className="help">这些操作不会自动调用外部服务；记录决定后才会从当前队列移除。</p>{decisions.length ? <div className="decision-list">{decisions.map(decision => <article key={decision.id}><div><strong>{decision.title}</strong><p>{decision.detail}</p></div><button onClick={() => dismissDecision(decision.id)}>记录决定</button></article>)}</div> : <p className="empty-state">当前没有待处理决定。</p>}</div>}
         <div className="console-footer">本地模拟流程 · 未连接 AI 服务</div>
       </aside>
     </div>
