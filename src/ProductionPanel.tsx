@@ -101,6 +101,20 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     logEvent(`finalize · ${tasks.length} tasks approved · scene unchanged`)
   }
 
+  function exportRunLog() {
+    const exportEvent = { id: events.length + 1, label: `export · ${tasks.length} tasks · local session` }
+    const exportEvents = [...events, exportEvent].slice(-8)
+    setEvents(exportEvents)
+    const payload = { exportedAt: new Date().toISOString(), seed, theme, themeVersion: themeCandidate ? `${themeCandidate}-local-01` : null, requestedStrategy, tasks, events: exportEvents }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `stable-city-run-${seed}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setMessage('Run Log 已导出为 JSON；本地记录未应用到场景。')
+  }
+
   return <>
     <h3>拆分制作任务</h3>
     <p className="help">本地模板演练：拆分 → 生成说明 → 人工审核。结果不会自动修改城市，刷新后清空。</p>
@@ -124,7 +138,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
       {task.status === 'rejected' && <button onClick={() => requeue(task.id)}>重新入队</button>}
     </article>)}</div>
-    <h3>Run Log</h3>
+    <div className="log-actions"><h3>Run Log</h3><button disabled={!events.length} onClick={exportRunLog}>导出 JSON</button></div>
     <div className="run-log" role="log" aria-live="polite">{events.length ? events.map(event => <span key={event.id}>{String(event.id).padStart(2, '0')} · {event.label}</span>) : <span>尚无运行事件。</span>}</div>
   </>
 }

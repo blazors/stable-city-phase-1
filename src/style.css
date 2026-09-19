@@ -113,6 +113,9 @@ h4 { font-size: 12px; font-weight: 500; line-height: 1.6; }
 .task-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; color: #8fa8a2; font: 10px Consolas, monospace; }
 .task-meta span { padding: 3px 5px; border: 1px solid #3d5558; border-radius: 3px; }
 .run-log { display: grid; gap: 5px; max-height: 150px; overflow: auto; padding: 9px 10px; background: #111e24; border: 1px solid #2f464d; border-radius: 5px; color: #9bb2aa; font: 10px/1.5 Consolas, monospace; }
+.log-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.log-actions h3 { margin: 0; }
+.log-actions button { padding: 6px 8px; font-size: 10px; }
 .task-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; color: #9bb2aa; font: 10px Consolas, monospace; }
 .task-summary span { padding: 5px 6px; background: #17282e; border: 1px solid #2f464d; border-radius: 3px; }
 .task-summary b { color: #e4c392; font-weight: 500; }
