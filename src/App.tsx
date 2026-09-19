@@ -153,7 +153,7 @@ export function App() {
             <div className="metric-grid"><div><strong>{metrics ? metrics.fps.toFixed(0) : '—'}</strong><span>FPS</span></div><div><strong>{metrics ? metrics.frameMs.toFixed(1) : '—'}</strong><span>FRAME MS</span></div><div><strong>{metrics?.calls ?? '—'}</strong><span>DRAWS</span></div><div><strong>{metrics ? metrics.triangles.toLocaleString() : '—'}</strong><span>TRIS</span></div><div><strong>{loadMs ?? '—'}</strong><span>LOAD MS</span></div></div>
             <h3>结构检查</h3><p className="help">对比当前城市数据与本次加载时的基准。</p>
             <button className="primary" onClick={() => setQcResult(getStableCitySignature(city) === baselineSignature && city.blocks.length === 16 && city.buildings.length === 60)}>运行结构检查</button>
-            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑。` : '未通过：StableCity 签名发生变化。'}</p>
+            <p className="result" role="status">{qcResult === null ? '尚未检查' : qcResult ? `通过：StableCity 签名一致，${city.blocks.length} 街区 / ${city.buildings.length} 建筑 / ${city.parcels.length} Parcel。` : '未通过：StableCity 签名发生变化。'}</p>
             <h3>人工视觉检查</h3><p className="help">切换主题、时段或镜头后会清空确认。</p>
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
@@ -162,7 +162,7 @@ export function App() {
           {panel === 'debug' && <>
             <div className="section-heading"><h3>Debug</h3><span>READ ONLY</span></div>
             <p className="help">查看本次场景装配的输入、策略与限制。</p>
-            <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
+            <div className="debug-list"><div><span>CitySeed</span><b>{city.seed}</b></div><div><span>StableCity</span><b>{city.signature}</b></div><div><span>UrbanGrammar</span><b>{city.urbanGrammar.primaryAxis} / {city.urbanGrammar.secondaryRoads} secondary</b></div><div><span>Transport</span><b>{city.transport.mainSpine} / rail {city.transport.elevatedRail ? 'on' : 'off'}</b></div><div><span>ThemeVersion</span><b>{theme}-local-01</b></div><div><span>Environment</span><b>{timeLabels[time]}</b></div><div><span>Execution</span><b>Procedural + local mock</b></div><div><span>AI Provider</span><b>未连接</b></div></div>
             <h3>ThemeSpec 快照</h3><pre>{JSON.stringify({ identity: themeLabels[theme], overlay: enabled ? 'active' : 'off', stableCity: 'locked', accent: themes[theme].accent }, null, 2)}</pre>
             <h3>运行日志</h3><div className="log"><span>[scene] stable city assembled</span><span>[theme] overlay {enabled ? 'applied' : 'disabled'}</span><span>[qc] awaiting manual visual review</span></div>
           </>}

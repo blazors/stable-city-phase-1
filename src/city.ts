@@ -1,7 +1,10 @@
 export type TimeOfDay = 'day' | 'sunset' | 'night'
 export type Building = { id: string; x: number; z: number; width: number; depth: number; height: number; tone: number }
 export type Block = { id: string; x: number; z: number; kind: 'urban' | 'void' | 'mega' }
-export type StableCity = { seed: number; blocks: Block[]; buildings: Building[]; signature: string }
+export type Parcel = { id: string; blockId: string; buildingId: string; x: number; z: number; width: number; depth: number; density: 'core' | 'edge' }
+export type UrbanGrammar = { primaryAxis: 'north-south'; secondaryRoads: number; localStreets: number; publicVoids: number; densityBands: Array<'core' | 'edge'> }
+export type TransportGraph = { mainSpine: 'east-west'; elevatedRail: boolean; stationCount: number }
+export type StableCity = { seed: number; blocks: Block[]; buildings: Building[]; parcels: Parcel[]; urbanGrammar: UrbanGrammar; transport: TransportGraph; signature: string }
 type StableCityData = Omit<StableCity, 'signature'>
 
 export function getStableCitySignature(city: StableCityData): string {
@@ -21,6 +24,7 @@ export function createStableCity(seed = 240319): StableCity {
   const rand = random(seed)
   const blocks: Block[] = []
   const buildings: Building[] = []
+  const parcels: Parcel[] = []
   const spacing = 18
   const voidIds = new Set(['1:1', '2:1'])
   const megaIds = new Set(['1:2', '2:2'])
@@ -36,10 +40,14 @@ export function createStableCity(seed = 240319): StableCity {
       const gx = n % 2, gz = Math.floor(n / 2)
       const density = (col === 1 || col === 2) ? 1.2 : 0.82
       const height = (6 + rand() * 15 + (peak ? 17 : 0)) * density
-        buildings.push({ id: `${key}-${n}`, x: x - 4.3 + gx * 6 + rand() * 1.2, z: z - 4.4 + gz * 5.5 + rand() * 1.2, width: 3 + rand() * 1.8, depth: 3 + rand() * 2, height, tone: rand() })
+        const building = { id: `${key}-${n}`, x: x - 4.3 + gx * 6 + rand() * 1.2, z: z - 4.4 + gz * 5.5 + rand() * 1.2, width: 3 + rand() * 1.8, depth: 3 + rand() * 2, height, tone: rand() }
+        buildings.push(building)
+        parcels.push({ id: `parcel-${building.id}`, blockId: key, buildingId: building.id, x: building.x, z: building.z, width: building.width + 1.2, depth: building.depth + 1.2, density: col === 1 || col === 2 ? 'core' : 'edge' })
       }
     }
   }
-  const stableCity = { seed, blocks, buildings }
+  const urbanGrammar: UrbanGrammar = { primaryAxis: 'north-south', secondaryRoads: 4, localStreets: 16, publicVoids: blocks.filter(block => block.kind === 'void').length, densityBands: ['core', 'edge'] }
+  const transport: TransportGraph = { mainSpine: 'east-west', elevatedRail: true, stationCount: 1 }
+  const stableCity = { seed, blocks, buildings, parcels, urbanGrammar, transport }
   return { ...stableCity, signature: getStableCitySignature(stableCity) }
 }
