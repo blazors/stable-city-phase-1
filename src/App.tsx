@@ -93,10 +93,35 @@ export function App() {
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [qcResult, setQcResult] = useState<boolean | null>(null)
   const [themeOffResult, setThemeOffResult] = useState<boolean | null>(null)
+  const [reportMessage, setReportMessage] = useState('')
   const [checked, setChecked] = useState<string[]>([])
   useEffect(() => { setChecked([]); setQcResult(null) }, [time, mode, theme, enabled])
   useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
   useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
+
+  function exportQualityReport() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      citySeed: city.seed,
+      stableCitySignature: city.signature,
+      theme: themeLabels[theme],
+      themeOverlay: enabled ? 'active' : 'off',
+      timeOfDay: time,
+      camera: mode,
+      metrics: metrics ? { ...metrics, loadMs } : { loadMs },
+      structureCheck: qcResult,
+      themeOffTest: themeOffResult,
+      visualChecks: visualChecks.map(name => ({ name, checked: checked.includes(name) })),
+      aiVisualJudge: 'not executed',
+    }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `stable-city-quality-${city.seed}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setReportMessage('Quality Report 已导出；未调用 AI 视觉判定。')
+  }
 
   return <main>
     <header className="app-header">
@@ -160,6 +185,8 @@ export function App() {
             {visualChecks.map(item => <label className="check-row" key={item}><input type="checkbox" checked={checked.includes(item)} onChange={e => setChecked(prev => e.target.checked ? [...prev, item] : prev.filter(value => value !== item))} />{item}</label>)}
             <p className="help">{checked.length} / {visualChecks.length} 项人工确认 · 未执行 AI 视觉判定</p>
             <div className="cost-row"><span>本地运行成本</span><b>$0.00</b></div>
+            <button className="primary" onClick={exportQualityReport}>导出 Quality Report</button>
+            {reportMessage && <p className="result" role="status">{reportMessage}</p>}
           </>}
           {panel === 'debug' && <>
             <div className="section-heading"><h3>Debug</h3><span>READ ONLY</span></div>
