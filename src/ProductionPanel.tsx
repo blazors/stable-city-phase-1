@@ -66,6 +66,11 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   function runNext() {
     const next = tasks.find(task => task.status === 'queued')
     if (!next) return
+    if (themeCandidateStatus !== 'confirmed') {
+      setMessage('请先确认 ThemeVersion，再运行制作任务。')
+      logEvent(`run.blocked · task:${next.id} · ThemeVersion unconfirmed`)
+      return
+    }
     const proposals = [
       '立面候选：保持建筑体量；以水平窗带区分楼层，暖色发光集中在入口和少量办公楼层。',
       '交通候选：保持道路与轨道；在巨构附近保留列车与小尺度车辆作为参照，避免遮挡洞口。',
@@ -98,7 +103,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <label className="strategy-select" htmlFor="requested-strategy"><span>Requested strategy</span><select id="requested-strategy" value={requestedStrategy} onChange={e => { const next = e.target.value as RequestedStrategy; setRequestedStrategy(next); logEvent(`strategy.select · ${next}`) }}><option value="auto">Auto · 自动路由</option><option value="direct-api">Direct API · 直连</option><option value="codex">Codex · 工程执行</option><option value="hybrid">Hybrid · 混合流程</option></select><small>当前 Provider 未连接，实际执行保持 local-template。</small></label>
     <div className="task-actions">
       <button className="primary" disabled={!brief.trim()} onClick={splitBrief}>拆分并加入队列</button>
-      <button disabled={!tasks.some(task => task.status === 'queued')} onClick={runNext}>运行下一项</button>
+      <button disabled={!tasks.some(task => task.status === 'queued') || themeCandidateStatus !== 'confirmed'} onClick={runNext}>运行下一项</button>
     </div>
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
