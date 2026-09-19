@@ -100,6 +100,8 @@ pre, .log { margin: 12px 0 22px; overflow-x: auto; background: #111e24; border: 
 .task-heading { display: flex; justify-content: space-between; align-items: start; gap: 5px; }
 h4 { font-size: 12px; font-weight: 500; line-height: 1.6; }
 .task-heading span { white-space: nowrap; font-size: 10px; color: #d5bd97; padding-top: 3px; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; color: #8fa8a2; font: 10px Consolas, monospace; }
+.task-meta span { padding: 3px 5px; border: 1px solid #3d5558; border-radius: 3px; }
 details { margin-top: 12px; font-size: 11px; line-height: 1.8; color: var(--muted); overflow-wrap: anywhere; }
 summary { cursor: pointer; }
 .candidate { font-size: 11px; line-height: 1.8; margin-top: 12px; color: #ccd7d1; }

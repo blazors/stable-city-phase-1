@@ -5,6 +5,8 @@ type Task = {
   id: number
   name: string
   input: string
+  themeVersion: string
+  execution: 'local-template'
   output: string
   status: 'queued' | 'review' | 'approved' | 'rejected'
 }
@@ -28,6 +30,8 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       id: prev.length + index + 1,
       name,
       input: input + ' / Seed ' + seed + ' / ' + theme,
+      themeVersion: `${interpretedTheme}-local-01`,
+      execution: 'local-template',
       output: '',
       status: 'queued',
     }))])
@@ -76,6 +80,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
     <p className="result" role="status">{message || '队列为空，输入制作要求开始。'}</p>
     <div className="task-list">{tasks.map(task => <article className="task-card" key={task.id}>
       <div className="task-heading"><h4>{String(task.id).padStart(2, '0')} · {task.name}</h4><span>{statusLabels[task.status]}</span></div>
+      <div className="task-meta"><span>{task.themeVersion}</span><span>{task.execution}</span></div>
       <details><summary>输入快照</summary><p>{task.input}</p></details>
       {task.output && <p className="candidate">{task.output}</p>}
       {task.status === 'review' && <div className="task-actions"><button onClick={() => review(task.id, 'approved')}>批准候选</button><button onClick={() => review(task.id, 'rejected')}>退回</button></div>}
