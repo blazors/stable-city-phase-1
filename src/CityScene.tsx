@@ -9,6 +9,13 @@ const city = createStableCity()
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string }
 export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number }
+export type QualityPreset = 'auto' | 'high' | 'balanced' | 'low'
+const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dpr: [number, number] }> = {
+  auto: { detail: 1, traffic: 16, dpr: [1, 1.5] },
+  high: { detail: 1, traffic: 16, dpr: [1, 2] },
+  balanced: { detail: .72, traffic: 10, dpr: [1, 1.25] },
+  low: { detail: .45, traffic: 6, dpr: [1, 1] },
+}
 const palettes = {
   day: { sky: '#b5cbd0', water: '#527b82', sun: '#fff1d2', ambient: '#c1d9e2', power: 3.2 },
   sunset: { sky: '#b7aca3', water: '#536f76', sun: '#ffc18b', ambient: '#a7bccf', power: 3.4 },
@@ -38,7 +45,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false }: { item
   </instancedMesh>
 }
 
-function Architecture({ theme, night }: { theme: ThemeName | null; night: boolean }) {
+function Architecture({ theme, night, detail }: { theme: ThemeName | null; night: boolean; detail: number }) {
   const { masses, trim, glass, windows, landscape } = useMemo(() => {
     const primary = theme ? themeSpecs[theme].primary : '#536d72'
     const masses: Box[] = [], trim: Box[] = [], glass: Box[] = [], windows: Box[] = [], landscape: Box[] = []
@@ -48,7 +55,7 @@ function Architecture({ theme, night }: { theme: ThemeName | null; night: boolea
       trim.push({ position: [b.x, .35, b.z], size: [b.width + .6, .7, b.depth + .6] })
       trim.push({ position: [b.x, b.height + .16, b.z], size: [b.width + .22, .32, b.depth + .22] })
       masses.push({ position: [b.x, b.height + .7, b.z], size: [b.width * .57, 1.1, b.depth * .58], color })
-      for (let y = 1.6; y < b.height - .7; y += 1.65) {
+      for (let y = 1.6; y < b.height - .7; y += detail > .8 ? 1.65 : detail > .55 ? 2.15 : 3.1) {
         glass.push({ position: [b.x, y, b.z], size: [b.width + .025, .52, b.depth + .025] })
         if ((Math.floor(y) + index) % 3 !== 0) {
           windows.push({ position: [b.x + b.width * .19, y, b.z - b.depth / 2 - .025], size: [b.width * .25, .29, .035] })
@@ -56,7 +63,7 @@ function Architecture({ theme, night }: { theme: ThemeName | null; night: boolea
         }
       }
       // Vertical stone fins break the horizontal bands without changing base mass.
-      for (const offset of [-.32, .32]) trim.push({ position: [b.x + b.width * offset, b.height / 2, b.z], size: [.16, b.height, b.depth + .11] })
+      if (detail > .55) for (const offset of [-.32, .32]) trim.push({ position: [b.x + b.width * offset, b.height / 2, b.z], size: [.16, b.height, b.depth + .11] })
     })
     for (const block of city.blocks.filter(b => b.kind === 'void')) {
       trim.push({ position: [block.x, .12, block.z], size: [14, .24, 14] })
@@ -145,7 +152,7 @@ function Ground({ water, night }: { water: string; night: boolean }) {
   </>
 }
 
-function Transport({ night }: { night: boolean }) {
+function Transport({ night, count }: { night: boolean; count: number }) {
   const train = useRef<Group>(null)
   const traffic = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
@@ -153,7 +160,7 @@ function Transport({ night }: { night: boolean }) {
     const t = clock.elapsedTime
     if (train.current) train.current.position.x = Math.sin(t * .12) * 31
     if (!traffic.current) return
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < count; i++) {
       const direction = i % 2 ? 1 : -1
       const p = ((t * (2.2 + i % 3 * .3) + i * 11) % 74 - 37) * direction
       dummy.position.set(p, .45, (i < 8 ? -18 : 36) + direction * .65)
@@ -168,7 +175,7 @@ function Transport({ night }: { night: boolean }) {
       <Boxes color="#ddd2b0" items={[-2.8, 0, 2.8].map(x => ({ position: [x, 0, 0], size: [2.6, 1, 1.5] }))} />
       <Boxes color={night ? '#f2c17e' : '#2e535f'} glow night={night} items={[-2.8, 0, 2.8].map(x => ({ position: [x, .12, -.76], size: [2.1, .37, .025] }))} />
     </group>
-    <instancedMesh ref={traffic} args={[undefined, undefined, 16]} frustumCulled={false} castShadow><boxGeometry /><meshStandardMaterial color="#d4bc92" roughness={.65} emissive="#b58241" emissiveIntensity={night ? .5 : 0} /></instancedMesh>
+    <instancedMesh ref={traffic} args={[undefined, undefined, count]} frustumCulled={false} castShadow><boxGeometry /><meshStandardMaterial color="#d4bc92" roughness={.65} emissive="#b58241" emissiveIntensity={night ? .5 : 0} /></instancedMesh>
   </>
 }
 
@@ -207,20 +214,21 @@ function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady:
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, onUpdate, onReady }: {
+export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, onReady }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
+  quality?: QualityPreset
   onUpdate: (metrics: RenderMetrics) => void; onReady: (ms: number) => void
 }) {
   const startedAt = useRef(performance.now())
-  const p = palettes[time], night = time === 'night'
-  return <Canvas shadows dpr={[1, 1.5]} gl={{ antialias: true }}>
+  const p = palettes[time], night = time === 'night', config = qualityConfig[quality]
+  return <Canvas shadows dpr={config.dpr} gl={{ antialias: true }}>
     <color attach="background" args={[p.sky]} /><fog attach="fog" args={[p.sky, 115, 260]} />
     <PerspectiveCamera makeDefault fov={mode === 'overview' ? 40 : 56} near={.5} far={1000} />
     <CameraDirector mode={mode} />
     <hemisphereLight args={[p.ambient, '#384b53', night ? 1.2 : 2]} />
     <directionalLight position={[-35, 55, -28]} color={p.sun} intensity={p.power} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={180} shadow-normalBias={.08} shadow-bias={-.00015} />
-    <Ground water={p.water} night={night} /><Architecture theme={enabled ? theme : null} night={night} />
-    <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} />
+    <Ground water={p.water} night={night} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
+    <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
     <OrbitControls target={[0, mode === 'overview' ? 5 : 13, mode === 'overview' ? 0 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={240} />
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
