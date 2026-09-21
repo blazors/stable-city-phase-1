@@ -1,5 +1,5 @@
 import { addAfterEffect, Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
+import { CameraShake, OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
@@ -281,7 +281,8 @@ export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, 
     <Ground water={p.water} night={night} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} />
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
-    <OrbitControls target={[0, mode === 'overview' ? 0 : 13, mode === 'overview' ? 24 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={600} />
+    <OrbitControls makeDefault target={[0, mode === 'overview' ? 0 : 13, mode === 'overview' ? 24 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={600} enableDamping dampingFactor={.06} />
+    {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }
