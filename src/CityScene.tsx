@@ -1,11 +1,13 @@
 import { addAfterEffect, Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, InstancedMesh, Object3D, type Group } from 'three'
+import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
+import { generateMetropolis } from './metropolis'
 
 const city = createStableCity()
+const metropolis = generateMetropolis(city.seed)
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string }
 export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number }
@@ -18,12 +20,12 @@ const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dp
 }
 const palettes = {
   day: { sky: '#b5cbd0', water: '#527b82', sun: '#fff1d2', ambient: '#c1d9e2', power: 3.2 },
-  sunset: { sky: '#b7aca3', water: '#536f76', sun: '#ffc18b', ambient: '#a7bccf', power: 3.4 },
+  sunset: { sky: '#a7b2c3', water: '#3d697c', sun: '#ffbb77', ambient: '#8eaacb', power: 4.3 },
   night: { sky: '#182b43', water: '#183342', sun: '#94bded', ambient: '#7898bc', power: 1.3 },
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
-function Boxes({ items, color = '#ffffff', glow = false, night = false }: { items: Box[]; color?: string; glow?: boolean; night?: boolean }) {
+function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean }) {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     if (!ref.current) return
@@ -40,7 +42,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false }: { item
     ref.current.computeBoundingSphere()
   }, [items])
   return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={!glow} receiveShadow={!glow}>
-    <boxGeometry />
+    {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
     <meshStandardMaterial color={color} roughness={glow ? .45 : .82} metalness={glow ? .15 : .04} emissive={glow ? color : '#000000'} emissiveIntensity={glow ? (night ? 1.8 : .08) : 0} />
   </instancedMesh>
 }
@@ -74,7 +76,7 @@ function Architecture({ theme, night, detail }: { theme: ThemeName | null; night
       }
     }
     return { masses, trim, glass, windows, landscape }
-  }, [theme])
+  }, [theme, detail])
   return <><Boxes items={masses} /><Boxes items={trim} color="#8b9d95" /><Boxes items={glass} color="#405e67" /><Boxes items={landscape} /><Boxes items={windows} color={night ? '#f2c17e' : '#687f82'} glow night={night} /></>
 }
 
@@ -115,6 +117,33 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
   </>
 }
 
+function Water({ color, night }: { color: string; night: boolean }) {
+  const material = useRef<ShaderMaterial>(null)
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uColor: { value: new Color(color) }, uHaze: { value: new Color(night ? '#182b43' : '#a7b2c3') }, uNight: { value: night ? 1 : 0 } }), [color, night])
+  useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.elapsedTime })
+  return <mesh position={[0, -1.85, 0]} rotation-x={-Math.PI / 2}>
+    <planeGeometry args={[2000, 2000]} />
+    <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`varying vec3 world;
+      void main(){ world=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0); }`}
+      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze;
+      void main(){
+        float ripple=sin(world.x*.38+sin(world.z*.3)+uTime*.4)*sin(world.z*.8-uTime*.3);
+        float riverCenter=65.0+sin(world.x/56.0)*11.0;
+        float extent=1.0-smoothstep(142.0,153.0,abs(world.x));
+        float shore=exp(-abs(abs(world.z-riverCenter)-11.5)*.5)*extent;
+        float broken=pow(max(0.0,sin(world.x*.8+sin(world.z*1.1)+uTime*.4)),6.0);
+        float glint=pow(max(0.0,ripple),14.0);
+        float channel=(1.0-smoothstep(10.0,14.0,abs(world.z-riverCenter)))*extent;
+        vec3 water=uColor*(.83+.04*ripple*channel);
+        water+=vec3(.65,.39,.14)*shore*broken*(.08+uNight*.18);
+        water+=vec3(.19,.29,.34)*glint*.04*channel;
+        gl_FragColor=vec4(mix(water,uHaze,smoothstep(270.0,680.0,distance(cameraPosition,world))),1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`} />
+  </mesh>
+}
+
 function Ground({ water, night }: { water: string; night: boolean }) {
   const details = useMemo(() => {
     const paving: Box[] = [], road: Box[] = [], markings: Box[] = [], lamps: Box[] = [], supports: Box[] = []
@@ -140,8 +169,9 @@ function Ground({ water, night }: { water: string; night: boolean }) {
     return { paving, road, markings, lamps, supports }
   }, [])
   return <>
-    <mesh position={[0, -2.2, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[2000, 2000]} /><meshStandardMaterial color={water} roughness={.76} /></mesh>
-    <Boxes color="#4e6668" items={[{ position: [0, -1.15, 0], size: [83, 2.3, 83] }]} />
+    <Water color={water} night={night} />
+    {/* Keep the structural slab below the paving surface to avoid coplanar depth fighting. */}
+    <Boxes color="#4e6668" items={[{ position: [0, -1.2, 0], size: [83, 2.3, 83] }]} />
     <Boxes color="#788a83" items={[{ position: [0, -.12, 0], size: [81, .24, 81] }, ...details.paving]} />
     <Boxes color="#3e5359" items={details.road} />
     <Boxes color="#abb9ac" items={details.markings} />
@@ -149,6 +179,27 @@ function Ground({ water, night }: { water: string; night: boolean }) {
     <Boxes color="#f2c17e" items={details.lamps} glow night={night} />
     <Boxes color="#b1b5a3" items={[{ position: [0, 8.6, -30], size: [76, .5, 2.5] }]} />
     <Boxes color="#3a545b" items={[{ position: [0, 8.9, -30], size: [76, .12, 1.8] }]} />
+  </>
+}
+
+function MetropolitanLandscape({ night }: { night: boolean }) {
+  return <>
+    <Boxes items={metropolis.land} color="#778782" />
+    <Boxes items={metropolis.parks} color="#526f56" />
+    <Boxes items={metropolis.paths} color="#a9ac96" />
+    <Boxes items={metropolis.roads} color="#485f65" />
+    <Boxes items={metropolis.buildings} />
+    <Boxes items={metropolis.roofs} color="#8a9c97" />
+    <Boxes items={metropolis.terraces} />
+    <Boxes items={metropolis.trees} foliage />
+    <Boxes items={metropolis.windows} color={night ? '#eabb7a' : '#496876'} glow night={night} />
+    <Boxes items={metropolis.lights} color="#e9b779" glow night={night} />
+    {metropolis.bridges.map(({ x, z }) => <group key={x} position={[x, 0, z]}>
+      <Boxes color="#b4b6a9" items={[{ position: [0, .65, 0], size: [5, 1, 32] }, ...[-9, 9].map(v => ({ position: [0, -1, v] as Vec3, size: [3, 3, 1] as Vec3 }))]} />
+      <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, 32] }))} />
+      {[-2.3, 2.3].map(v => <mesh key={v} position={[v, 1, 0]} rotation-y={Math.PI / 2} scale={[1, .45, 1]}><torusGeometry args={[13, .24, 6, 40, Math.PI]} /><meshStandardMaterial color="#a8c4c3" roughness={.6} /></mesh>)}
+    </group>)}
+    {night && <><pointLight position={[0, 8, 2]} color="#ffd098" intensity={450} distance={48} decay={2} /><pointLight position={[-11, 16, 2]} color="#ffb86d" intensity={180} distance={28} decay={2} /></>}
   </>
 }
 
@@ -182,10 +233,10 @@ function Transport({ night, count }: { night: boolean; count: number }) {
 function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
   const { camera, size } = useThree()
   useLayoutEffect(() => {
-    const position: Vec3 = mode === 'overview' ? [-80, 66, -92] : [-18, 18, -20]
+    const position: Vec3 = mode === 'overview' ? [-210, 174, -242] : [-18, 18, -20]
     const fit = Math.max(1, 1.35 / (size.width / size.height))
     camera.position.set(position[0] * fit, position[1] * fit, position[2] * fit)
-    camera.lookAt(0, mode === 'overview' ? 5 : 13, mode === 'overview' ? 0 : 9)
+    camera.lookAt(0, mode === 'overview' ? 0 : 13, mode === 'overview' ? 24 : 9)
     camera.updateProjectionMatrix()
   }, [camera, mode, size.width, size.height])
   return null
@@ -222,14 +273,15 @@ export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, 
   const startedAt = useRef(performance.now())
   const p = palettes[time], night = time === 'night', config = qualityConfig[quality]
   return <Canvas shadows dpr={config.dpr} gl={{ antialias: true }}>
-    <color attach="background" args={[p.sky]} /><fog attach="fog" args={[p.sky, 115, 260]} />
+    <color attach="background" args={[p.sky]} /><fog attach="fog" args={[p.sky, 270, 680]} />
     <PerspectiveCamera makeDefault fov={mode === 'overview' ? 40 : 56} near={.5} far={1000} />
     <CameraDirector mode={mode} />
-    <hemisphereLight args={[p.ambient, '#384b53', night ? 1.2 : 2]} />
+    <hemisphereLight args={[p.ambient, '#384b53', night ? .85 : time === 'sunset' ? 1.3 : 2]} />
     <directionalLight position={[-35, 55, -28]} color={p.sun} intensity={p.power} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={180} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground water={p.water} night={night} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
+    <MetropolitanLandscape night={night} />
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
-    <OrbitControls target={[0, mode === 'overview' ? 5 : 13, mode === 'overview' ? 0 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={240} />
+    <OrbitControls target={[0, mode === 'overview' ? 0 : 13, mode === 'overview' ? 24 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={600} />
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }
