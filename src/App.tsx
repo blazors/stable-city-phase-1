@@ -6,7 +6,7 @@ import { createStableCity, getStableCitySignature, validateStableCity, type Time
 import { ProductionPanel } from './ProductionPanel'
 import { themeSpecs, type ThemeName } from './theme'
 import { getArtMetrics } from './artMetrics'
-import { clearUiDraft, loadProductionDraft, loadUiDraft, saveUiDraft, type AssetKey, type ViewName } from './runPersistence'
+import { clearUiDraft, loadProductionDraft, loadUiDraft, saveUiDraft, type AssetKey, type ThemeMatrixResult, type ViewName } from './runPersistence'
 import { getProviderSnapshot } from './provider'
 import { validateCoreContracts } from './validation'
 
@@ -49,27 +49,28 @@ export function App() {
   const [view, setView] = useState<ViewName>(() => persistedUi?.view ?? 'overview')
   const [selectedAsset, setSelectedAsset] = useState<AssetKey>(() => persistedUi?.selectedAsset ?? 'hero')
   const [decisionDrawerOpen, setDecisionDrawerOpen] = useState(false)
-  const [decisions, setDecisions] = useState<Decision[]>(defaultDecisions)
+  const [decisions, setDecisions] = useState<Decision[]>(() => persistedUi?.decisions?.length ? persistedUi.decisions : defaultDecisions)
   const runStartedAt = useRef(performance.now())
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [metrics, setMetrics] = useState<RenderMetrics | null>(null)
   const [metricsHistory, setMetricsHistory] = useState<PerformanceSample[]>([])
   const [loadMs, setLoadMs] = useState<number | null>(null)
   const [sceneError, setSceneError] = useState<string | null>(null)
-  const [qcResult, setQcResult] = useState<boolean | null>(null)
-  const [qcIssues, setQcIssues] = useState<string[]>([])
-  const [themeOffResult, setThemeOffResult] = useState<boolean | null>(null)
-  const [themeMatrixResult, setThemeMatrixResult] = useState<Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }> | null>(null)
+  const [qcResult, setQcResult] = useState<boolean | null>(() => persistedUi?.qcResult ?? null)
+  const [qcIssues, setQcIssues] = useState<string[]>(() => persistedUi?.qcIssues ?? [])
+  const [themeOffResult, setThemeOffResult] = useState<boolean | null>(() => persistedUi?.themeOffResult ?? null)
+  const [themeMatrixResult, setThemeMatrixResult] = useState<ThemeMatrixResult | null>(() => persistedUi?.themeMatrixResult ?? null)
   const [reportMessage, setReportMessage] = useState('')
-  const [checked, setChecked] = useState<string[]>([])
+  const [checked, setChecked] = useState<string[]>(() => persistedUi?.checked ?? [])
+  const restoreVisualState = useRef(true)
   useEffect(() => {
     const interval = window.setInterval(() => setElapsedSeconds(Math.floor((performance.now() - runStartedAt.current) / 1000)), 1000)
     return () => window.clearInterval(interval)
   }, [])
-  useEffect(() => { setChecked([]); setQcResult(null); setQcIssues([]) }, [time, mode, theme, enabled])
-  useEffect(() => { setThemeOffResult(null) }, [time, mode, theme])
-  useEffect(() => { if (enabled) setThemeOffResult(null) }, [enabled])
-  useEffect(() => { setThemeMatrixResult(null) }, [time, mode])
+  useEffect(() => {
+    if (restoreVisualState.current) { restoreVisualState.current = false; return }
+    setChecked([]); setQcResult(null); setQcIssues([]); setThemeOffResult(null); setThemeMatrixResult(null)
+  }, [enabled, mode, theme, time])
   useEffect(() => { setSceneError(null) }, [enabled, mode, quality, theme, time])
   const themeMatrixPass = themeMatrixResult !== null && Object.values(themeMatrixResult).every(result => result.stableCity && result.themeSpecDistinct)
   const qualityGate = coreValidation.valid && qcResult === true && themeOffResult === true && themeMatrixPass && checked.length === visualChecks.length && metrics !== null && loadMs !== null
@@ -82,8 +83,8 @@ export function App() {
   }, [mode, quality, time, view])
 
   useEffect(() => {
-    saveUiDraft({ time, mode, theme, enabled, quality, view, selectedAsset })
-  }, [enabled, mode, quality, selectedAsset, theme, time, view])
+    saveUiDraft({ time, mode, theme, enabled, quality, view, selectedAsset, decisions, checked, qcResult, qcIssues, themeOffResult, themeMatrixResult })
+  }, [checked, decisions, enabled, mode, quality, qcIssues, qcResult, selectedAsset, theme, themeMatrixResult, themeOffResult, time, view])
 
   function dismissDecision(id: string) {
     setDecisions(prev => prev.filter(decision => decision.id !== id))
@@ -92,6 +93,7 @@ export function App() {
   function resetUiDraft() {
     clearUiDraft()
     setTime('sunset'); setMode('overview'); setTheme('harbor'); setEnabled(true); setQuality('auto'); setView('overview'); setSelectedAsset('hero')
+    setDecisions(defaultDecisions); setChecked([]); setQcResult(null); setQcIssues([]); setThemeOffResult(null); setThemeMatrixResult(null)
     setSceneError(null)
   }
 
@@ -209,6 +211,7 @@ export function App() {
       },
       validation: { core: coreValidation, structureCheck: qcResult, structureIssues: qcIssues, themeOffTest: themeOffResult, themeMatrixTest: themeMatrixResult },
       visual: { visualChecks: visualChecks.map(name => ({ name, checked: checked.includes(name) })), qualityGate: qualityGate ? 'PASS' : 'INCOMPLETE', sceneError, aiVisualJudge: 'not executed' },
+      decisionQueue: decisions,
       runtime: { loadMs, latest: metrics, samples: metricsHistory, note: '本地浏览器采样；未包含外部 Provider 调用。' },
       providers: getProviderSnapshot(),
       productionDraft: productionDraft ?? null,

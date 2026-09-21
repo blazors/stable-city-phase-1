@@ -8,7 +8,12 @@ const PRODUCTION_KEY = 'stable-city:production-draft:v1'
 
 export type ViewName = 'overview' | 'assets' | 'quality' | 'pipeline' | 'cost' | 'debug' | 'intelligence'
 export type AssetKey = 'hero' | 'signature' | 'street' | 'atmosphere'
-export type UiDraft = { time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey }
+export type StoredDecision = { id: string; title: string; detail: string }
+export type ThemeMatrixResult = Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }>
+export type UiDraft = {
+  time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey
+  decisions?: StoredDecision[]; checked?: string[]; qcResult?: boolean | null; qcIssues?: string[]; themeOffResult?: boolean | null; themeMatrixResult?: ThemeMatrixResult | null
+}
 export type StoredTask = { id: number; name: string; input: string; themeVersion: string; capability: Capability; requestedStrategy: RequestedStrategy; strategy: 'local-template'; provider: 'none'; fallbackReason: 'auto-local' | 'provider-unavailable'; output: string; status: 'queued' | 'review' | 'approved' | 'rejected' }
 export type ProductionDraft = { brief: string; tasks: StoredTask[]; events: Array<{ id: number; label: string }>; requestedStrategy: RequestedStrategy; themeCandidate: ThemeName | null; themeCandidateStatus: 'preview' | 'confirmed' | 'rejected' | null }
 
