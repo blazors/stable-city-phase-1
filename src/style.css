@@ -62,6 +62,10 @@ h2 { font-size: 20px; font-weight: 500; }
 .context-actions { margin-top: 11px; padding-top: 9px; border-top: 1px solid #2d4249; }
 .context-toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; cursor: pointer; }
 .context-toggle input { width: 14px; height: 14px; }
+.core-check { color: #b8d59c; font: 9px Consolas, monospace; }
+.core-check.fail { color: #d98f78; }
+.draft-reset { padding: 5px 7px; color: #a9b8b2; background: transparent; border-color: #42575a; border-radius: 3px; font-size: 10px; }
+.draft-reset:hover:not(:disabled) { background: #263b40; border-color: #7d908d; }
 .decision-trigger { padding: 5px 7px; color: #e2bc85; background: transparent; border-color: #6b5841; border-radius: 3px; font: 10px Consolas, monospace; }
 .decision-trigger:hover:not(:disabled) { background: #3a3028; border-color: #b99769; }
 .workspace-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #142229; }
@@ -251,6 +255,9 @@ summary { cursor: pointer; }
 .visual-page .scene-toolbar { padding-bottom: 13px; }
 .visual-stage, .quality-stage { position: relative; isolation: isolate; overflow: hidden; height: min(62vh, 720px); min-height: 410px; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
 .visual-stage canvas, .quality-stage canvas { display: block; filter: saturate(1.08) contrast(1.04); }
+.scene-fallback { display: grid; align-content: center; justify-items: center; gap: 8px; height: 100%; min-height: 260px; padding: 24px; color: #e6d7bf; background: radial-gradient(circle at 50% 38%, #304c51, #16262c 72%); text-align: center; }
+.scene-fallback strong { font-size: 15px; font-weight: 500; }
+.scene-fallback small { max-width: 34ch; color: #aabbb3; font-size: 11px; line-height: 1.6; }
 .overview-page { display: flex; flex-direction: column; height: 100%; min-height: 420px; }
 .overview-page .surface-heading { display: none; }
 .overview-page .visual-stage { flex: 1; height: auto; min-height: 320px; }
@@ -338,6 +345,7 @@ summary { cursor: pointer; }
 .cost-trend span { color: var(--muted); font: 9px Consolas, monospace; letter-spacing: .5px; }
 .cost-trend strong { color: #d7e1d4; font-size: 12px; font-weight: 500; }
 .cost-trend small { color: #a7b9b1; font-size: 10px; }
+.cost-actions { display: flex; flex-wrap: wrap; gap: 14px; }
 .text-link { padding: 0; color: #d8c29d; background: transparent; border: 0; font-size: 11px; }
 .text-link:hover:not(:disabled) { color: #f0dfc4; background: transparent; border: 0; }
 .debug-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 28px; max-width: 1180px; }
@@ -373,4 +381,31 @@ summary { cursor: pointer; }
   .quality-issue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .debug-layout { grid-template-columns: 1fr; gap: 14px; }
   .pipeline-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  main { padding: 0 8px 10px; }
+  .app-header { height: 68px; }
+  h1 { font-size: 19px; }
+  .identity p { letter-spacing: 1px; }
+  .console-header { padding: 15px 12px 13px; }
+  .view-nav, .view-surface { padding-left: 12px; padding-right: 12px; }
+  .context-grid, .console-header .context-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .context-actions { align-items: flex-start; flex-wrap: wrap; }
+  .core-check { order: 3; flex-basis: 100%; }
+  .scene-toolbar { align-items: stretch; }
+  .scene-toolbar .segmented { flex: 1 1 100%; }
+  .scene-toolbar .segmented button { flex: 1; }
+  .quality-picker { margin-left: 0; justify-content: space-between; }
+  .visual-stage, .quality-stage { min-height: 290px; height: min(58vh, 520px); }
+  .scene-caption { left: 14px; bottom: 14px; }
+  .scene-caption strong { font-size: 19px; }
+  .quality-summary, .comparison-row, .asset-gallery, .quality-issue-grid, .pipeline-facts, .resource-table, .intelligence-page .intelligence-list { grid-template-columns: 1fr; }
+  .asset-toolbar, .asset-detail { align-items: stretch; flex-direction: column; }
+  .asset-detail button { width: 100%; }
+  .strategy-select { grid-template-columns: 1fr; }
+  .strategy-select > small { grid-column: auto; }
+  .provider-status { grid-template-columns: 1fr; }
+  .provider-status > small { grid-column: auto; }
+  .run-controls-host { margin-top: 14px; }
+  .console-footer { line-height: 1.5; }
 }

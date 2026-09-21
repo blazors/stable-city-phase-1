@@ -265,14 +265,25 @@ function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady:
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, onReady }: {
+function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
+  const { gl } = useThree()
+  useEffect(() => {
+    const canvas = gl.domElement
+    const handleLost = (event: Event) => { event.preventDefault(); onError?.('WebGL context lost · 渲染上下文丢失') }
+    canvas.addEventListener('webglcontextlost', handleLost)
+    return () => canvas.removeEventListener('webglcontextlost', handleLost)
+  }, [gl, onError])
+  return null
+}
+
+export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, onReady, onError }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   quality?: QualityPreset
-  onUpdate: (metrics: RenderMetrics) => void; onReady: (ms: number) => void
+  onUpdate: (metrics: RenderMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
   const startedAt = useRef(performance.now())
   const p = palettes[time], night = time === 'night', config = qualityConfig[quality]
-  return <Canvas shadows dpr={config.dpr} gl={{ antialias: true }}>
+  return <Canvas shadows dpr={config.dpr} gl={{ antialias: true }} fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}>
     <color attach="background" args={[p.sky]} /><fog attach="fog" args={[p.sky, 270, 680]} />
     <PerspectiveCamera makeDefault fov={mode === 'overview' ? 40 : 56} near={.5} far={1000} />
     <CameraDirector mode={mode} />
@@ -283,6 +294,7 @@ export function Scene({ time, mode, theme, enabled, quality = 'auto', onUpdate, 
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
     <OrbitControls makeDefault target={[0, mode === 'overview' ? 0 : 13, mode === 'overview' ? 24 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={600} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
+    <WebGLGuard onError={onError} />
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }
