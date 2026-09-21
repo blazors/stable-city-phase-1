@@ -27,7 +27,13 @@ h1 { font-size: 22px; letter-spacing: -.6px; font-weight: 600; }
 .segmented button[aria-pressed="true"] { background: #34484c; color: #f1e3ce; }
 .viewport { position: relative; flex: 1; min-height: 0; isolation: isolate; overflow: hidden; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
 .viewport canvas { display: block; }
-.scene-caption { position: absolute; left: 22px; bottom: 22px; pointer-events: none; color: #fff5df; text-shadow: 0 1px 8px #18303a; display: grid; gap: 7px; }
+.scene-grade { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .34; mix-blend-mode: soft-light; background: radial-gradient(ellipse at 50% 38%, transparent 32%, rgba(5,14,22,.42) 100%); }
+.scene-grade::before { content: ""; position: absolute; inset: 0; opacity: .08; mix-blend-mode: overlay; background: repeating-linear-gradient(0deg, rgba(255,255,255,.1) 0 1px, transparent 1px 3px); }
+.scene-grade::after { content: ""; position: absolute; inset: 0; opacity: .2; mix-blend-mode: soft-light; }
+.scene-grade.grade-day::after { background: linear-gradient(145deg, rgba(135,190,201,.18), rgba(255,236,196,.1)); }
+.scene-grade.grade-sunset::after { background: linear-gradient(145deg, rgba(255,155,105,.22), rgba(76,115,165,.18)); }
+.scene-grade.grade-night::after { background: linear-gradient(145deg, rgba(32,70,130,.28), rgba(255,170,92,.1)); }
+.scene-caption { position: absolute; left: 22px; bottom: 22px; z-index: 2; pointer-events: none; color: #fff5df; text-shadow: 0 1px 8px #18303a; display: grid; gap: 7px; }
 .scene-caption span { font: 10px Consolas, monospace; letter-spacing: 2px; }
 .scene-caption strong { font-size: 24px; font-weight: 500; letter-spacing: 2px; }
 .scene-caption small { font-size: 11px; opacity: .8; }
@@ -231,7 +237,7 @@ summary { cursor: pointer; }
 .surface-heading p { max-width: 62ch; margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .visual-page .scene-toolbar { padding-bottom: 13px; }
 .visual-stage, .quality-stage { position: relative; isolation: isolate; overflow: hidden; height: min(62vh, 720px); min-height: 410px; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
-.visual-stage canvas, .quality-stage canvas { display: block; }
+.visual-stage canvas, .quality-stage canvas { display: block; filter: saturate(1.08) contrast(1.04); }
 .overview-page { display: flex; flex-direction: column; height: 100%; min-height: 420px; }
 .overview-page .surface-heading { display: none; }
 .overview-page .visual-stage { flex: 1; height: auto; min-height: 320px; }
