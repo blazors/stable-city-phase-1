@@ -163,6 +163,12 @@ input[type="checkbox"] { width: 17px; height: 17px; flex: none; accent-color: va
 .strategy-select select { min-width: 0; padding: 6px 7px; color: #dbe2dc; background: #111e24; border: 1px solid #41545c; border-radius: 4px; }
 .strategy-select > small { grid-column: 1 / -1; }
 .strategy-select .strategy-help { color: #b1c4bc; line-height: 1.5; }
+.provider-status { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin: 0 0 12px; padding: 8px 10px; background: #142329; border: 1px solid #2f464d; border-radius: 5px; }
+.provider-status > div { display: grid; gap: 3px; min-width: 0; }
+.provider-status span, .provider-status small { color: var(--muted); font-size: 10px; }
+.provider-status strong { overflow: hidden; color: #d5c19f; font: 10px Consolas, monospace; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.provider-status strong.offline { color: #e2a994; }
+.provider-status > small { grid-column: 1 / -1; padding-top: 5px; border-top: 1px solid #2b4147; line-height: 1.45; }
 textarea { display: block; width: 100%; resize: vertical; min-height: 80px; max-height: 200px; background: #111e24; border: 1px solid #41545c; color: #dbe2dc; border-radius: 5px; padding: 10px; font-size: 12px; line-height: 1.8; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .monitor-task { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 22px; }
