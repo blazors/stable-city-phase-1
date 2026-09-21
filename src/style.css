@@ -21,6 +21,8 @@ h1 { font-size: 22px; letter-spacing: -.6px; font-weight: 600; }
 .scene-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .scene-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 0 12px; }
 .quality-picker { display: flex; align-items: center; gap: 7px; margin-left: auto; padding: 3px 7px 3px 9px; color: var(--muted); background: #142229; border: 1px solid #2f454b; border-radius: 5px; font: 10px Consolas, monospace; white-space: nowrap; }
+.quality-picker span { display: grid; gap: 1px; }
+.quality-picker span small { color: #718789; font: 8px Consolas, monospace; letter-spacing: .4px; }
 .quality-picker select { min-width: 118px; padding: 5px 6px; color: #dbe2dc; background: #111e24; border: 1px solid #41545c; border-radius: 3px; font: 10px Consolas, monospace; }
 .segmented { display: flex; gap: 3px; background: #18272d; padding: 3px; border-radius: 7px; }
 .segmented button { border: none; background: transparent; padding: 8px 12px; white-space: nowrap; }
@@ -155,10 +157,12 @@ input[type="checkbox"] { width: 17px; height: 17px; flex: none; accent-color: va
 .theme-preview-grid { display: grid; gap: 4px; margin-top: 8px; line-height: 1.6; }
 .theme-preview-grid span { color: #c8d4cd; font-size: 10px; }
 .strategy-select { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin: 10px 0; padding: 9px 10px; background: #17282e; border: 1px solid #2f4a50; border-radius: 5px; }
-.strategy-select span, .strategy-select small { color: var(--muted); font-size: 10px; }
-.strategy-select span { align-self: center; font-family: Consolas, monospace; text-transform: uppercase; }
+.strategy-select > span, .strategy-select > small { color: var(--muted); font-size: 10px; }
+.strategy-select > span { display: grid; gap: 2px; align-self: center; font-family: Consolas, monospace; text-transform: uppercase; }
+.strategy-select > span small { color: #718789; font: 9px/1.35 "Segoe UI", "Microsoft YaHei", sans-serif; text-transform: none; }
 .strategy-select select { min-width: 0; padding: 6px 7px; color: #dbe2dc; background: #111e24; border: 1px solid #41545c; border-radius: 4px; }
-.strategy-select small { grid-column: 1 / -1; }
+.strategy-select > small { grid-column: 1 / -1; }
+.strategy-select .strategy-help { color: #b1c4bc; line-height: 1.5; }
 textarea { display: block; width: 100%; resize: vertical; min-height: 80px; max-height: 200px; background: #111e24; border: 1px solid #41545c; color: #dbe2dc; border-radius: 5px; padding: 10px; font-size: 12px; line-height: 1.8; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .monitor-task { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 22px; }
