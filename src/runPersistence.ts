@@ -1,6 +1,7 @@
 import type { TimeOfDay } from './city'
 import type { QualityPreset } from './CityScene'
 import type { ThemeName } from './theme'
+import type { Weather } from './Atmosphere'
 import type { RequestedStrategy, Capability } from './router'
 
 const UI_KEY = 'stable-city:ui-draft:v1'
@@ -11,6 +12,7 @@ export type AssetKey = 'hero' | 'signature' | 'street' | 'atmosphere'
 export type StoredDecision = { id: string; title: string; detail: string }
 export type ThemeMatrixResult = Record<ThemeName, { stableCity: boolean; themeSpecDistinct: boolean }>
 export type UiDraft = {
+  weather?: Weather
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey
   decisions?: StoredDecision[]; checked?: string[]; qcResult?: boolean | null; qcIssues?: string[]; themeOffResult?: boolean | null; themeMatrixResult?: ThemeMatrixResult | null
 }
