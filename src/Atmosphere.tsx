@@ -14,7 +14,7 @@ export const weatherDescriptions: Record<Weather, string> = {
 // Environment owns light direction and colour; themes never rebuild the city.
 export const atmospherePalettes = {
   day: { zenith: '#477f9c', horizon: '#d8e1da', haze: '#b8cfd0', water: '#497985', sun: '#fff1d5', ambient: '#c2dce8', cloud: '#fff7e3', shadow: '#8babb7', direction: [.5, .55, .68], power: 3.0 },
-  sunset: { zenith: '#535b86', horizon: '#e8b69a', haze: '#ada1a4', water: '#4a6778', sun: '#ffc183', ambient: '#b1c1dc', cloud: '#f7c09c', shadow: '#454c6e', direction: [.38, .09, .92], power: 3.5 },
+  sunset: { zenith: '#535b86', horizon: '#e8b69a', haze: '#ada1a4', water: '#4a6778', sun: '#ffc183', ambient: '#b1c1dc', cloud: '#f7c09c', shadow: '#454c6e', direction: [-.58, .23, .72], power: 4.0 },
   night: { zenith: '#0c182d', horizon: '#344a66', haze: '#243c54', water: '#183342', sun: '#bed5f1', ambient: '#819dc7', cloud: '#7d94b3', shadow: '#263c59', direction: [.55, .3, .78], power: 1.2 },
 } satisfies Record<TimeOfDay, { zenith: string; horizon: string; haze: string; water: string; sun: string; ambient: string; cloud: string; shadow: string; direction: number[]; power: number }>
 

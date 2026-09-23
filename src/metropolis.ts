@@ -48,21 +48,28 @@ export function generateMetropolis(seed: number) {
     const westPeak = Math.exp(-((x + 162) ** 2 / 2600 + (z - 108) ** 2 / 1500))
     const cluster = Math.max(eastPeak, westPeak * .7)
     const gardenQuarter = z < -45 || (x < -100 && z < 35)
+    // Coherent neighbourhood silhouettes: long residential slabs, compact blocks,
+    // and slender towers concentrated at the two distant peaks.
+    const variant = Math.abs(Math.round(x / 18) + Math.round(z / 18) * 3) % 4
+    const tower = cluster > .24
     const height = 4 + random() * (gardenQuarter ? 4 : 6) + cluster * 19
-    const width = gardenQuarter ? 9 + random() * 3 : 6 + random() * 4, depth = 7 + random() * 4
+    const width = tower ? 5 + random() * 2 : variant === 0 ? 12 : variant === 1 ? 5 : 8 + random() * 3
+    const depth = tower ? 6 + random() * 2 : variant === 1 ? 12 : variant === 0 ? 5 : 7 + random() * 3
     const px = x + random() * 2, pz = z + random() * 2
     buildings.push({ position: [px, height / 2, pz], size: [width, height, depth], color: gardenQuarter ? (random() > .5 ? '#b7b39b' : '#82958a') : (random() > .7 ? '#a5b2ac' : '#5d7c83') })
-    roofs.push({ position: [px, height + .3, pz], size: [width * .7, .6, depth * .75] })
-    if (cluster > .3) {
+    roofs.push({ position: [px, height + .12, pz], size: [width + .15, .24, depth + .15] })
+    if (tower) {
       terraces.push({ position: [px, height + 1.7, pz], size: [width * .66, 3, depth * .65], color: '#8eaaa7' })
     } else if (gardenQuarter) {
-      terraces.push({ position: [px, height + .55, pz], size: [width * .8, .4, depth * .8], color: '#63816b' })
+      terraces.push({ position: [px, height + .36, pz], size: [width * .8, .2, depth * .8], color: '#63816b' })
     } else {
-      terraces.push({ position: [px + width * .42, 1.5, pz], size: [width * .9, 3, depth + 1], color: '#84928c' })
+      terraces.push({ position: [px, height + .7, pz], size: [width * .35, .9, depth * .45], color: '#84928c' })
     }
     for (let y = 2; y < height; y += 3.5) {
-      windows.push({ position: [px, y, pz - depth / 2 - .03], size: [width * .65, .24, .06] })
-      windows.push({ position: [px - width / 2 - .03, y, pz], size: [.06, .24, depth * .6] })
+      // Interrupted lit floors prevent every facade becoming an equally bright stripe.
+      if ((Math.floor(y) + variant) % 3 === 0) continue
+      windows.push({ position: [px + (variant - 1.5) * width * .1, y, pz - depth / 2 - .03], size: [width * .38, .3, .06] })
+      windows.push({ position: [px - width / 2 - .03, y, pz], size: [.06, .3, depth * .4] })
     }
   }
   const bridges = [-174, -66, 66, 174].map(x => ({ x, z: riverCenter(x), span: riverHalfWidth(x) * 2 + 12 }))

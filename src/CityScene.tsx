@@ -144,7 +144,7 @@ function Water({ time, weather }: { time: TimeOfDay; weather: Weather }) {
         float spec=pow(max(0.0,dot(reflect(-uSun,normal),viewDirection)),150.0);
         float shimmer=.4+.6*pow(max(0.0,sin(world.z*1.5+uTime*.6+sin(world.x*.9))),3.0);
         water+=uSunColor*spec*shimmer*uReflection;
-        gl_FragColor=vec4(mix(water,uHaze,smoothstep(270.0,680.0,distance(cameraPosition,world))),1.0);
+        gl_FragColor=vec4(mix(water,uHaze,smoothstep(420.0,950.0,distance(cameraPosition,world))),1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`} />
@@ -298,8 +298,8 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
     <PerspectiveCamera makeDefault fov={mode === 'overview' ? 44 : 56} near={.5} far={1800} />
     <CameraDirector mode={mode} />
-    <hemisphereLight args={[p.ambient, '#4c5159', night ? .85 : time === 'sunset' ? 2.1 : 2]} />
-    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={night ? .25 : .9} />
+    <hemisphereLight args={[p.ambient, '#4c5159', night ? .85 : time === 'sunset' ? 1.3 : 2]} />
+    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={night ? .25 : time === 'sunset' ? .65 : .9} />
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * (weather === 'haze' ? .65 : 1)} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} />
