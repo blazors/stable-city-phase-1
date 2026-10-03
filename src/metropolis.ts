@@ -22,7 +22,9 @@ export function generateMetropolis(seed: number) {
     land.push({ position: [px, -1.2, (south + center - width) / 2], size: [3, 2, center - width - south] })
     land.push({ position: [px, -1.2, (north + center + width) / 2], size: [3, 2, north - center - width] })
     for (const side of [-1, 1]) {
-      parks.push({ position: [px, -.08, center + side * (width + 6)], size: [3, .18, 12] })
+      // Widen the south-bank green where the civic park meets the river.
+      const greenWidth = side === -1 && px > -115 && px < -45 ? 22 : 12
+      parks.push({ position: [px, -.08, center + side * (width + greenWidth / 2)], size: [3, .18, greenWidth] })
       paths.push({ position: [px, .03, center + side * (width + 2)], size: [3, .15, 1.5] })
       if (x % 9 === 0) lights.push({ position: [px, .35, center + side * (width + .8)], size: [1.5, .16, .2] })
       if (x % 6 === 0) trees.push({ position: [px, 2, center + side * (width + 6 + random() * 4)], size: [2.5, 4, 2.7], color: random() > .5 ? '#567a62' : '#819271' })
@@ -47,12 +49,16 @@ export function generateMetropolis(seed: number) {
     const eastPeak = Math.exp(-((x - 126) ** 2 / 2100 + (z - 180) ** 2 / 1800))
     const westPeak = Math.exp(-((x + 162) ** 2 / 2600 + (z - 108) ** 2 / 1500))
     const cluster = Math.max(eastPeak, westPeak * .7)
-    const gardenQuarter = z < -45 || (x < -100 && z < 35)
+    // A low civic apron and a quiet gap between the two distant peaks keep
+    // the core readable across the river, without changing its locked masses.
+    const civicApron = Math.abs(x) <= 54 && z >= 54 && z < riverCenter(x)
+    const skylineValley = Math.abs(x) <= 54 && z > riverCenter(x)
+    const gardenQuarter = z < -45 || (x < -100 && z < 35) || civicApron || skylineValley
     // Coherent neighbourhood silhouettes: long residential slabs, compact blocks,
     // and slender towers concentrated at the two distant peaks.
     const variant = Math.abs(Math.round(x / 18) + Math.round(z / 18) * 3) % 4
-    const tower = cluster > .24
-    const height = 4 + random() * (gardenQuarter ? 4 : 6) + cluster * 19
+    const tower = !gardenQuarter && cluster > .34
+    const height = 4 + random() * (gardenQuarter ? 4 : 6) + (gardenQuarter ? 0 : cluster * 19)
     const width = tower ? 5 + random() * 2 : variant === 0 ? 12 : variant === 1 ? 5 : 8 + random() * 3
     const depth = tower ? 6 + random() * 2 : variant === 1 ? 12 : variant === 0 ? 5 : 7 + random() * 3
     const px = x + random() * 2, pz = z + random() * 2

@@ -293,7 +293,13 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   const startedAt = useRef(performance.now())
   const p = atmospherePalettes[time], night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
-  return <Canvas shadows dpr={config.dpr} gl={{ antialias: true }} fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}>
+  return <Canvas
+    shadows
+    dpr={config.dpr}
+    gl={{ antialias: true }}
+    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+    fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
+  >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weather === 'haze' ? 190 : 320, weather === 'haze' ? 620 : 900]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
     <PerspectiveCamera makeDefault fov={mode === 'overview' ? 44 : 56} near={.5} far={1800} />

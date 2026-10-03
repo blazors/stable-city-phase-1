@@ -19,6 +19,11 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   const city = createStableCity(seed), scene = generateMetropolis(seed)
   assert.equal(validateStableCity(city).valid, true, `core contract: ${seed}`)
   assert.deepEqual(scene, generateMetropolis(seed), `deterministic outskirts: ${seed}`)
+  const civicApron = scene.buildings.filter(({ position: [x, , z] }) => Math.abs(x) < 57 && z >= 54)
+  assert(civicApron.length > 0, 'civic apron and skyline valley exist')
+  assert(civicApron.every(({ size: [, height] }) => height <= 8), 'open civic apron and skyline valley stay low')
+  const parkMouth = scene.parks.filter(({ position: [x], size: [w] }) => w === 3 && x > -115 && x < -45)
+  assert.equal(parkMouth.filter(({ size: [, , depth] }) => depth === 22).length, parkMouth.length / 2, 'south-bank park mouth widens continuously')
   for (const [name, items] of Object.entries(scene)) {
     if (name === 'bridges') continue
     for (const item of items) {
