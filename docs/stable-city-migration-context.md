@@ -7,7 +7,7 @@
 - 项目：StableCity Phase 1 / Art-First 3D Web City
 - Git：`https://github.com/blazors/stable-city-phase-1.git`
 - 当前分支：`codex/stable-city-phase1`
-- 当前 checkpoint：`403ef84 优化城市天际线层次并改善日落河岸光照`
+- 当前 checkpoint：`466e704 整理 StableCity 跨设备迁移开发上下文`
 - 技术栈：React 19、TypeScript、Vite、Three.js、@react-three/fiber、@react-three/drei
 - 包管理器：pnpm
 - 本地启动：`pnpm install` 后执行 `pnpm dev`
@@ -46,7 +46,7 @@ Art Direction > Composition > Silhouette > Atmosphere > Theme Identity > Urban S
 
 ## 已验证事实
 
-最近一次 Mac/Windows 迁移前的桌面采样为 1440×960、Vite 开发服务：约 60 FPS、16.6–16.7 ms、52 draws、约 110,114–115,082 triangles；不同镜头会改变可见对象计数。`pnpm validate` 与 `node scripts/validate-metropolis.mjs` 均通过。当前项目没有真实 Provider、模型、Image API 或 3D API 调用。
+最近一次 Mac/Windows 迁移前的桌面采样为 1440×960、Vite 开发服务：约 60 FPS、16.6–16.7 ms、52 draws、约 107,054–115,082 triangles；不同主题、天气、质量档和镜头会改变可见对象计数。`pnpm validate` 与 `node scripts/validate-metropolis.mjs` 均通过。2026-10-03 又完成了 3×3×3 主题/时段/天气组合抽查、四档质量抽查和七个 Console 视图切换抽查。当前项目没有真实 Provider、模型、Image API 或 3D API 调用。
 
 ## Astra 工作范围
 
@@ -73,7 +73,7 @@ Astra 只负责高阶视觉判断和实现指导：
 
 ## 当前下一项
 
-继续做 Astra 视觉阶段：审查并优化宏观构图、镜头语言、天际线和灯光层级。保留核心 StableCity 结构，不新增依赖，不接 API，不删除文件，不修改受保护核心规则；若必须改变这些边界，先提出 ChangeRequest。
+非 Astra 工程已收口。下一项只在切换 GPT-6 Astra 后进行：审查并优化宏观构图、镜头语言、天际线和灯光层级。保留核心 StableCity 结构，不新增依赖，不接 API，不删除文件，不修改受保护核心规则；若必须改变这些边界，先提出 ChangeRequest。
 
 ## 迁移边界
 
