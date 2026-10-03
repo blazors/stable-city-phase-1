@@ -29,14 +29,13 @@ h1 { font-size: 22px; letter-spacing: -.6px; font-weight: 600; }
 .segmented button[aria-pressed="true"] { background: #34484c; color: #f1e3ce; }
 .viewport { position: relative; flex: 1; min-height: 0; isolation: isolate; overflow: hidden; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
 .viewport canvas { display: block; }
-.scene-grade { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .34; mix-blend-mode: soft-light; background: radial-gradient(ellipse at 50% 38%, transparent 32%, rgba(5,14,22,.42) 100%); }
-.scene-grade::before { content: ""; position: absolute; inset: 0; opacity: .08; mix-blend-mode: overlay; background: repeating-linear-gradient(0deg, rgba(255,255,255,.1) 0 1px, transparent 1px 3px); }
-.scene-grade::after { content: ""; position: absolute; inset: 0; opacity: .2; mix-blend-mode: soft-light; }
-.scene-grade.grade-day::after { background: linear-gradient(145deg, rgba(135,190,201,.18), rgba(255,236,196,.1)); }
-.scene-grade.grade-sunset::after { background: linear-gradient(145deg, rgba(255,155,105,.22), rgba(76,115,165,.18)); }
-.scene-grade.grade-night::after { background: linear-gradient(145deg, rgba(32,70,130,.28), rgba(255,170,92,.1)); }
-.scene-aperture { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .2; }
-.scene-aperture::before { content: ""; position: absolute; inset: -3%; background: radial-gradient(ellipse at 50% 44%, transparent 0 38%, rgba(8,13,18,.12) 63%, rgba(3,7,11,.3) 100%); }
+.scene-grade { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: none; }
+.scene-grade::before, .scene-grade::after { content: none; }
+/* One restrained edge falloff; leave the subject and authored sky colours clear. */
+.scene-aperture { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: .18; }
+.scene-aperture.aperture-sunset { opacity: .16; }
+.scene-aperture.aperture-night { opacity: .1; }
+.scene-aperture::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, transparent 0 58%, rgba(3,7,11,.24) 100%); }
 .scene-aperture::after { content: none; }
 .scene-caption { position: absolute; left: 22px; bottom: 22px; z-index: 2; pointer-events: none; color: #fff5df; text-shadow: 0 1px 8px #18303a; display: grid; gap: 7px; }
 .scene-caption span { font: 10px Consolas, monospace; letter-spacing: 2px; }
@@ -258,7 +257,10 @@ summary { cursor: pointer; }
 .weather-picker .segmented button { font-size: 11px; padding: 6px 10px; }
 .weather-picker > small { color: #9baeb1; font-size: 10px; line-height: 1.5; }
 .visual-stage, .quality-stage { position: relative; isolation: isolate; overflow: hidden; height: min(62vh, 720px); min-height: 410px; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
-.visual-stage canvas, .quality-stage canvas { display: block; filter: saturate(1.08) contrast(1.04); }
+.visual-stage, .quality-stage { --scene-saturation: 1.02; --scene-contrast: 1.02; }
+.visual-stage:has(.grade-sunset), .quality-stage:has(.grade-sunset) { --scene-saturation: 1; --scene-contrast: 1.035; }
+.visual-stage:has(.grade-night), .quality-stage:has(.grade-night) { --scene-saturation: .96; --scene-contrast: 1; }
+.visual-stage canvas, .quality-stage canvas { display: block; filter: saturate(var(--scene-saturation)) contrast(var(--scene-contrast)); }
 .scene-fallback { display: grid; align-content: center; justify-items: center; gap: 8px; height: 100%; min-height: 260px; padding: 24px; color: #e6d7bf; background: radial-gradient(circle at 50% 38%, #304c51, #16262c 72%); text-align: center; }
 .scene-fallback strong { font-size: 15px; font-weight: 500; }
 .scene-fallback small { max-width: 34ch; color: #aabbb3; font-size: 11px; line-height: 1.6; }

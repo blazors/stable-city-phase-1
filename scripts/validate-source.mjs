@@ -19,6 +19,11 @@ const checks = [
   ['Sun and key light share environment direction', /lightPosition = sunDirection\(time\).*<directionalLight position=\{lightPosition\}/s, 'src/CityScene.tsx'],
   ['Sky disc uses environment direction', /uSun: \{ value: sunDirection\(time\) \}/, 'src/Atmosphere.tsx'],
   ['Sunset shader state resets outside sunset', /uSunset: \{ value: time === 'sunset' \? 1 : 0 \}/, 'src/Atmosphere.tsx'],
+  ['Scene grade has no screen tint or scanline layer', /\.scene-grade \{[^}]*pointer-events: none; background: none; \}.*\.scene-grade::before, \.scene-grade::after \{ content: none; \}/s, 'src/style.css'],
+  ['Night grade preserves shadow contrast', /\.visual-stage:has\(\.grade-night\), \.quality-stage:has\(\.grade-night\) \{[^}]*--scene-contrast: 1;/, 'src/style.css'],
+  ['Aperture leaves a wide transparent hero region', /\.scene-aperture::before \{[^}]*transparent 0 58%/, 'src/style.css'],
+  ['Night aperture is lighter than the daytime edge falloff', /\.scene-aperture\.aperture-night \{ opacity: \.1; \}/, 'src/style.css'],
+  ['Overview and Quality share canvas grading', /\.visual-stage canvas, \.quality-stage canvas \{[^}]*filter: saturate\(var\(--scene-saturation\)\) contrast\(var\(--scene-contrast\)\)/, 'src/style.css'],
 ]
 
 const failures = checks.flatMap(([label, pattern, file]) => pattern.test(read(file)) ? [] : [`${label} failed (${file})`])
