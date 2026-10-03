@@ -7,7 +7,7 @@ import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
-import { megaPracticalPositions, timeLighting, weatherLighting } from './lighting'
+import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
@@ -295,6 +295,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   const p = atmospherePalettes[time], night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
   const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
+  const fog = sceneFog(time, weather, p.haze)
   const sceneCamera = useMemo(() => createSceneCamera(mode), [mode])
   return <Canvas
     camera={sceneCamera}
@@ -309,7 +310,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
-    <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weatherLight.fogNear, weatherLight.fogFar]} />
+    <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
     <CameraDirector mode={mode} />
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />

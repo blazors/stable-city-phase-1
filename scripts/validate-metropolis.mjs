@@ -13,7 +13,17 @@ async function sourceModule(file) {
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
 const { cameraPosition, cameraViews, createSceneCamera } = await sourceModule('../src/camera.ts')
-const { weatherLighting, timeLighting, megaPracticalPositions } = await sourceModule('../src/lighting.ts')
+const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = await sourceModule('../src/lighting.ts')
+for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(weatherLighting)) {
+  const fog = sceneFog(time, weather, '#243c54')
+  const baseline = weatherLighting[weather]
+  assert.equal(fog.near, baseline.fogNear, 'fog adjustment preserves the near-field boundary')
+  if (time === 'night' && weather === 'haze') {
+    assert(fog.far > baseline.fogFar && fog.far < weatherLighting.clouds.fogFar, 'night haze retains skyline depth and remains denser than clouds')
+    assert.equal(fog.color, '#344c60', 'night haze uses the authored cool aerial perspective')
+  } else assert.deepEqual(fog, { color: '#243c54', near: baseline.fogNear, far: baseline.fogFar }, `${time}/${weather}: original fog retained`)
+}
+assert.deepEqual(sceneFog('night', 'clear', '#abcdef'), { color: '#abcdef', near: 340, far: 920 }, 'leaving night haze restores caller palette and clear distance')
 assert(weatherLighting.clear.direct > weatherLighting.clouds.direct && weatherLighting.clouds.direct > weatherLighting.haze.direct, 'weather softens direct light progressively')
 assert(weatherLighting.haze.fogNear < weatherLighting.clouds.fogNear && weatherLighting.clouds.fogNear < weatherLighting.clear.fogNear, 'weather depth contracts progressively')
 for (const weather of Object.values(weatherLighting)) {
