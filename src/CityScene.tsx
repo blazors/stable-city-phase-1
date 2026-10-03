@@ -6,6 +6,7 @@ import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
+import { cameraPosition, cameraViews } from './camera'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
@@ -241,10 +242,8 @@ function Transport({ night, count }: { night: boolean; count: number }) {
 function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
   const { camera, size } = useThree()
   useLayoutEffect(() => {
-    const position: Vec3 = mode === 'overview' ? [-225, 122, -260] : [-27, 26, -37]
-    const fit = Math.max(1, Math.min(1.8, 1.35 / (size.width / size.height)))
-    camera.position.set(position[0] * fit, position[1] * fit, position[2] * fit)
-    camera.lookAt(0, 13, mode === 'overview' ? 45 : 9)
+    camera.position.set(...cameraPosition(mode, size.width / size.height))
+    camera.lookAt(...cameraViews[mode].target)
     camera.updateProjectionMatrix()
   }, [camera, mode, size.width, size.height])
   return null
@@ -302,7 +301,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weather === 'haze' ? 190 : 320, weather === 'haze' ? 620 : 900]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
-    <PerspectiveCamera makeDefault fov={mode === 'overview' ? 44 : 56} near={.5} far={1800} />
+    <PerspectiveCamera makeDefault fov={cameraViews[mode].fov} near={.5} far={1800} />
     <CameraDirector mode={mode} />
     <hemisphereLight args={[p.ambient, '#4c5159', night ? .85 : time === 'sunset' ? 1.3 : 2]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={night ? .25 : time === 'sunset' ? .65 : .9} />
@@ -310,7 +309,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     <Ground time={time} weather={weather} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} />
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
-    <OrbitControls makeDefault target={[0, 13, mode === 'overview' ? 45 : 9]} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={800} enableDamping dampingFactor={.06} />
+    <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <WebGLGuard onError={onError} />
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />

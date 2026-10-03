@@ -10,6 +10,20 @@ async function sourceModule(file) {
 }
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
+const { cameraPosition, cameraViews } = await sourceModule('../src/camera.ts')
+for (const mode of ['overview', 'mega']) {
+  const { position, target, fov } = cameraViews[mode]
+  assert.deepEqual(cameraPosition(mode, 1.5), position, `${mode}: desktop camera preset`)
+  assert(fov > 30 && fov < 60, `${mode}: moderate perspective`)
+  for (const aspect of [.5, 1, 1.5, 2.5]) {
+    const adapted = cameraPosition(mode, aspect)
+    assert(adapted.every(Number.isFinite), `${mode}: finite adapted position`)
+    const scale = (adapted[0] - target[0]) / (position[0] - target[0])
+    assert(scale >= 1 && scale <= 2.7, `${mode}: bounded viewport fit`)
+    assert(Math.hypot(...adapted.map((value, axis) => value - target[axis])) < (mode === 'overview' ? 1400 : 800), `${mode}: orbit bounds retain adapted camera`)
+    for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: viewport preserves viewing direction`)
+  }
+}
 const overlapsCore = ({ position: [x, , z], size: [w, , d] }) => Math.abs(x) - w / 2 < 41.5 && Math.abs(z) - d / 2 < 41.5
 const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].some(offset => {
   const px = x + offset * w

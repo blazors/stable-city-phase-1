@@ -13,6 +13,8 @@ const checks = [
   ['Local routing boundary', /strategy: 'local-template'.*provider: 'none'/s, 'src/router.ts'],
   ['Run report version', /RUN_REPORT_VERSION = 'local-run-report\.v1'/, 'src/runReport.ts'],
   ['Run report schema guard', /runContext.*city.*runtime.*providers/s, 'src/runReport.ts'],
+  ['Camera and orbit share the focal point', /camera\.lookAt\(\.\.\.cameraViews\[mode\]\.target\).*<OrbitControls[^>]*target=\{cameraViews\[mode\]\.target\}/s, 'src/CityScene.tsx'],
+  ['Camera mode clears previous orbit damping', /<OrbitControls key=\{mode\}/, 'src/CityScene.tsx'],
 ]
 
 const failures = checks.flatMap(([label, pattern, file]) => pattern.test(read(file)) ? [] : [`${label} failed (${file})`])
