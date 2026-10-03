@@ -1,3 +1,5 @@
+import { PerspectiveCamera } from 'three'
+
 type Vec3 = [number, number, number]
 
 export const cameraViews = {
@@ -10,4 +12,13 @@ export function cameraPosition(mode: keyof typeof cameraViews, aspect: number): 
   const fit = Math.max(1, Math.min(2.7, 1.35 / aspect))
   // Adapt distance around the subject, preserving direction and focal point.
   return position.map((value, axis) => target[axis] + (value - target[axis]) * fit) as Vec3
+}
+
+export function createSceneCamera(mode: keyof typeof cameraViews) {
+  const view = cameraViews[mode]
+  const camera = new PerspectiveCamera(view.fov, 1, .5, 1800)
+  camera.position.set(...view.position)
+  camera.lookAt(...view.target)
+  camera.updateMatrixWorld()
+  return camera
 }

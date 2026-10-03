@@ -1,12 +1,12 @@
 import { addAfterEffect, Canvas, useFrame, useThree } from '@react-three/fiber'
-import { CameraShake, OrbitControls, PerspectiveCamera } from '@react-three/drei'
+import { CameraShake, OrbitControls } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
-import { cameraPosition, cameraViews } from './camera'
+import { cameraPosition, cameraViews, createSceneCamera } from './camera'
 import { megaPracticalPositions, timeLighting, weatherLighting } from './lighting'
 
 const city = createStableCity()
@@ -295,7 +295,14 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   const p = atmospherePalettes[time], night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
   const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
+  const sceneCamera = useMemo(() => createSceneCamera(mode), [mode])
   return <Canvas
+    camera={sceneCamera}
+    onCreated={({ camera, size }) => {
+      camera.position.set(...cameraPosition(mode, size.width / size.height))
+      camera.lookAt(...cameraViews[mode].target)
+      camera.updateProjectionMatrix()
+    }}
     shadows
     dpr={config.dpr}
     gl={{ antialias: true }}
@@ -304,7 +311,6 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weatherLight.fogNear, weatherLight.fogFar]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
-    <PerspectiveCamera makeDefault fov={cameraViews[mode].fov} near={.5} far={1800} />
     <CameraDirector mode={mode} />
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />

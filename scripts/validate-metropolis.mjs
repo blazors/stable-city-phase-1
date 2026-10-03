@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import ts from 'typescript'
+import { Vector3 } from 'three'
 
 // Execute the actual generators without adding a test runner or emitting build files.
 async function sourceModule(file) {
   const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } })
-  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+  const resolved = outputText.replace(/from (['"])three\1/g, `from '${import.meta.resolve('three')}'`)
+  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`)
 }
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
-const { cameraPosition, cameraViews } = await sourceModule('../src/camera.ts')
+const { cameraPosition, cameraViews, createSceneCamera } = await sourceModule('../src/camera.ts')
 const { weatherLighting, timeLighting, megaPracticalPositions } = await sourceModule('../src/lighting.ts')
 assert(weatherLighting.clear.direct > weatherLighting.clouds.direct && weatherLighting.clouds.direct > weatherLighting.haze.direct, 'weather softens direct light progressively')
 assert(weatherLighting.haze.fogNear < weatherLighting.clouds.fogNear && weatherLighting.clouds.fogNear < weatherLighting.clear.fogNear, 'weather depth contracts progressively')
@@ -22,6 +24,11 @@ assert.equal(megaPracticalPositions.length, 2, 'bounded practical light count')
 assert(megaPracticalPositions.every(position => position.every(Number.isFinite)), 'finite visible emitter positions')
 for (const mode of ['overview', 'mega']) {
   const { position, target, fov } = cameraViews[mode]
+  const initial = createSceneCamera(mode)
+  assert.deepEqual(initial.position.toArray(), position, `${mode}: first-frame position is ready before mount`)
+  const expectedDirection = new Vector3(...target).sub(initial.position).normalize()
+  assert(initial.getWorldDirection(new Vector3()).distanceTo(expectedDirection) < 1e-9, `${mode}: first-frame direction targets the subject`)
+  assert(initial.position.y > target[1] && initial.fov === fov, `${mode}: initial camera is above subject with authored lens`)
   assert.deepEqual(cameraPosition(mode, 1.5), position, `${mode}: desktop camera preset`)
   assert(fov > 30 && fov < 60, `${mode}: moderate perspective`)
   for (const aspect of [.5, 1, 1.5, 2.5]) {
