@@ -15,6 +15,10 @@ const checks = [
   ['Run report schema guard', /runContext.*city.*runtime.*providers/s, 'src/runReport.ts'],
   ['Camera and orbit share the focal point', /camera\.lookAt\(\.\.\.cameraViews\[mode\]\.target\).*<OrbitControls[^>]*target=\{cameraViews\[mode\]\.target\}/s, 'src/CityScene.tsx'],
   ['Camera mode clears previous orbit damping', /<OrbitControls key=\{mode\}/, 'src/CityScene.tsx'],
+  ['Visible practicals share light position and colour', /megaPracticalPositions\.map\(position => \(\{ position, size:.*night && megaPracticalPositions\.map\(position => <pointLight[^>]*position=\{position\} color=\{accent\}/s, 'src/CityScene.tsx'],
+  ['Sun and key light share environment direction', /lightPosition = sunDirection\(time\).*<directionalLight position=\{lightPosition\}/s, 'src/CityScene.tsx'],
+  ['Sky disc uses environment direction', /uSun: \{ value: sunDirection\(time\) \}/, 'src/Atmosphere.tsx'],
+  ['Sunset shader state resets outside sunset', /uSunset: \{ value: time === 'sunset' \? 1 : 0 \}/, 'src/Atmosphere.tsx'],
 ]
 
 const failures = checks.flatMap(([label, pattern, file]) => pattern.test(read(file)) ? [] : [`${label} failed (${file})`])

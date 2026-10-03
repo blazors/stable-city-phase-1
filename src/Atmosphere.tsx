@@ -35,7 +35,7 @@ const vertexShader = `
 const fragmentShader = `
   varying vec3 vDirection;
   uniform vec3 uZenith, uHorizon, uSunColor, uCloud, uShadow, uSun;
-  uniform float uTime, uCoverage, uHaze, uNight, uDetail;
+  uniform float uTime, uCoverage, uHaze, uNight, uSunset, uDetail;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
     vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -58,6 +58,8 @@ const fragmentShader = `
     // A faint 22-degree halo, anchored to the actual sun rather than the screen.
     float halo = exp(-pow((angle-.384)/.024, 2.0)) * .055 * (1.0-uHaze*.7);
     sky += uSunColor * (aureole + halo) * mix(1.0, .3, uNight) * smoothstep(0.0, .04, height);
+    // Warm low cloud layers belong to the sunward horizon.
+    sky += uSunColor * uSunset * exp(-height*7.0) * pow(max(cosine,0.0),3.0) * .24;
     float disc = 1.0-smoothstep(.012, .017, angle);
     sky = mix(sky, uSunColor*2.7, disc);
 
@@ -70,11 +72,11 @@ const fragmentShader = `
     density *= smoothstep(.025, .15, height);
     float edge = (1.0-smoothstep(.12, .6, density))*density;
     float sunSide = pow(max(cosine, 0.0), 5.0);
-    vec3 cloud = mix(uShadow, uCloud, clamp(.16 + body*.38 + sunSide*.32, 0.0, 1.0));
+    vec3 cloud = mix(uShadow, uCloud, clamp(.16 + body*.26 + sunSide*.5, 0.0, 1.0));
     cloud += uSunColor*edge*sunSide*.9*(1.0-uNight*.8);
     sky = mix(sky, cloud, density*.82);
     float wisps = smoothstep(.58, .76, fbm(p*vec2(1.8, 9.0)+drift*.4+45.0));
-    sky = mix(sky, uCloud, wisps*.15*smoothstep(.03,.3,height)*(1.0-uNight*.65));
+    sky = mix(sky, uCloud, wisps*.15*smoothstep(.03,.3,height)*(1.0-uNight*.65)*(.2+uCoverage*.8));
     sky = mix(sky, uHorizon, uHaze*.32*(1.0-smoothstep(0.0,.7,height)));
     gl_FragColor = vec4(sky, 1.0);
     #include <tonemapping_fragment>
@@ -93,7 +95,7 @@ export function Atmosphere({ time, weather, lowDetail }: { time: TimeOfDay; weat
       uZenith: { value: new Color(p.zenith) }, uHorizon: { value: new Color(p.horizon) },
       uSunColor: { value: new Color(p.sun) }, uCloud: { value: new Color(p.cloud) },
       uShadow: { value: new Color(p.shadow) }, uSun: { value: sunDirection(time) },
-      uTime: { value: 0 }, uNight: { value: time === 'night' ? 1 : 0 },
+      uTime: { value: 0 }, uNight: { value: time === 'night' ? 1 : 0 }, uSunset: { value: time === 'sunset' ? 1 : 0 },
       uCoverage: { value: weather === 'clouds' ? 1 : weather === 'haze' ? .55 : 0 },
       uHaze: { value: weather === 'haze' ? 1 : .12 }, uDetail: { value: lowDetail ? 0 : 1 },
     }

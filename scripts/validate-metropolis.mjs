@@ -11,6 +11,15 @@ async function sourceModule(file) {
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
 const { cameraPosition, cameraViews } = await sourceModule('../src/camera.ts')
+const { weatherLighting, timeLighting, megaPracticalPositions } = await sourceModule('../src/lighting.ts')
+assert(weatherLighting.clear.direct > weatherLighting.clouds.direct && weatherLighting.clouds.direct > weatherLighting.haze.direct, 'weather softens direct light progressively')
+assert(weatherLighting.haze.fogNear < weatherLighting.clouds.fogNear && weatherLighting.clouds.fogNear < weatherLighting.clear.fogNear, 'weather depth contracts progressively')
+for (const weather of Object.values(weatherLighting)) {
+  assert(weather.fogFar > weather.fogNear && weather.fogNear > 100, 'fog preserves near-field receivers')
+  for (const time of Object.values(timeLighting)) assert(time.hemisphere * weather.fill > .4 && time.fill > 0, 'lighting preserves silhouette fill in every state')
+}
+assert.equal(megaPracticalPositions.length, 2, 'bounded practical light count')
+assert(megaPracticalPositions.every(position => position.every(Number.isFinite)), 'finite visible emitter positions')
 for (const mode of ['overview', 'mega']) {
   const { position, target, fov } = cameraViews[mode]
   assert.deepEqual(cameraPosition(mode, 1.5), position, `${mode}: desktop camera preset`)

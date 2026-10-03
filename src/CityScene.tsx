@@ -7,6 +7,7 @@ import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
 import { cameraPosition, cameraViews } from './camera'
+import { megaPracticalPositions, timeLighting, weatherLighting } from './lighting'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
@@ -103,11 +104,12 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
     ]} />
     <Boxes color={accent} glow night={night} items={[
       { position: [0, 24.7, 9], size: [29, .35, 10] },
-      { position: [-5.83, 11, 5.5], size: [.12, 17, .15] }, { position: [5.83, 11, 5.5], size: [.12, 17, .15] },
+      ...megaPracticalPositions.map(position => ({ position, size: [.12, 17, .15] as Vec3 })),
       { position: [0, 19.4, 5.5], size: [11.5, .13, .15] },
     ]} />
     <mesh position={[-14, 17, 9]} rotation-z={-.18} castShadow receiveShadow><boxGeometry args={[17, 3, 7]} /><meshStandardMaterial color="#607b7a" roughness={.7} /></mesh>
     <Boxes color="#b8bca9" items={[{ position: [-21, 9, 9], size: [1, 15, 1] }, { position: [-14, 18.5, 9], size: [16, .18, 6] }]} />
+    {night && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28} distance={16} decay={2} />)}
     <group position={[0, 27.8, 9]} ref={rotor}>
       <mesh rotation-x={Math.PI / 2} castShadow><torusGeometry args={[2.7, .17, 8, 40]} /><meshStandardMaterial color={accent} roughness={.5} metalness={.4} /></mesh>
       <Boxes color={accent} items={[{ position: [0, 0, 0], size: [5.5, .18, .18] }, { position: [0, 0, 0], size: [.18, .18, 5.5] }]} />
@@ -292,6 +294,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   const startedAt = useRef(performance.now())
   const p = atmospherePalettes[time], night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
+  const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
   return <Canvas
     shadows
     dpr={config.dpr}
@@ -299,13 +302,13 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
-    <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weather === 'haze' ? 190 : 320, weather === 'haze' ? 620 : 900]} />
+    <color attach="background" args={[p.haze]} /><fog attach="fog" args={[p.haze, weatherLight.fogNear, weatherLight.fogFar]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
     <PerspectiveCamera makeDefault fov={cameraViews[mode].fov} near={.5} far={1800} />
     <CameraDirector mode={mode} />
-    <hemisphereLight args={[p.ambient, '#4c5159', night ? .85 : time === 'sunset' ? 1.3 : 2]} />
-    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={night ? .25 : time === 'sunset' ? .65 : .9} />
-    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * (weather === 'haze' ? .65 : 1)} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
+    <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />
+    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
+    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} />
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
