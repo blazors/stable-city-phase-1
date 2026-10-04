@@ -47,7 +47,34 @@ for (const mode of ['overview', 'mega']) {
     const scale = (adapted[0] - target[0]) / (position[0] - target[0])
     assert(scale >= 1 && scale <= 2.7, `${mode}: bounded viewport fit`)
     assert(Math.hypot(...adapted.map((value, axis) => value - target[axis])) < (mode === 'overview' ? 1400 : 800), `${mode}: orbit bounds retain adapted camera`)
-    for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: viewport preserves viewing direction`)
+    if (mode !== 'mega' || aspect >= .9) {
+      for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: landscape viewport preserves viewing direction`)
+    } else {
+      assert(Math.abs((adapted[0] - target[0]) / (adapted[2] - target[2])) < Math.abs((position[0] - target[0]) / (position[2] - target[2])), 'portrait Mega turns toward the central skyline valley')
+    }
+  }
+}
+const foregroundTower = createStableCity().buildings.find(building => building.id === '1:0-0')
+for (const aspect of [.5, 1.5]) {
+  const camera = createSceneCamera('mega')
+  camera.aspect = aspect
+  camera.position.set(...cameraPosition('mega', aspect))
+  camera.lookAt(...cameraViews.mega.target)
+  camera.updateProjectionMatrix()
+  camera.updateMatrixWorld()
+  const project = (x, y, z) => new Vector3(x, y, z).project(camera)
+  const top = project(foregroundTower.x, foregroundTower.height, foregroundTower.z)
+  const base = project(foregroundTower.x, 0, foregroundTower.z)
+  const heroTop = project(0, 29, 9), heroBase = project(0, 0, 9)
+  const heroHeight = heroTop.y - heroBase.y
+  assert((top.y - base.y) / heroHeight < 1.35, 'Mega foreground tower has bounded perspective enlargement')
+  assert(top.x < -.25 && top.x > -.9, 'Mega foreground tower stays a left-side scale reference')
+  assert(heroHeight > .3 && heroTop.y < .8 && heroBase.y > -.8, 'Mega hero retains readable scale with vertical breathing room')
+  if (aspect === .5) {
+    assert(heroHeight > .38, 'portrait Mega preserves hero size instead of over-retreating')
+    for (const x of [-13, 13]) for (const y of [0, 27]) {
+      assert(Math.abs(project(x, y, 9).x) < .85, 'portrait Mega gate stays inside horizontal safe frame')
+    }
   }
 }
 const overlapsCore = ({ position: [x, , z], size: [w, , d] }) => Math.abs(x) - w / 2 < 41.5 && Math.abs(z) - d / 2 < 41.5
