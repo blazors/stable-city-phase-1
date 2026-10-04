@@ -8,6 +8,7 @@ import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
+import { createMegaRoofRibs, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
@@ -88,7 +89,7 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
       for (const dx of [-2.4, -1.2, 0, 1.2, 2.4]) result.push({ position: [x + dx, 13, 4.82], size: [.28, 26, .55] })
       for (const z of [6, 8, 10, 12]) result.push({ position: [x + (x > 0 ? 3.12 : -3.12), 13, z], size: [.3, 26, .26] })
     }
-    for (let x = -13; x <= 13; x += 1.3) result.push({ position: [x, 26, 9], size: [.28, 2.2, 10.5] })
+    result.push(...createMegaRoofRibs())
     return result
   }, [])
   return <>
@@ -100,10 +101,10 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
     <Boxes color="#e2dac3" items={ribs} />
     <Boxes color="#2e525a" items={[
       { position: [-5.93, 10.5, 9], size: [.12, 18, 7] }, { position: [5.93, 10.5, 9], size: [.12, 18, 7] },
-      { position: [0, 21.5, 4.45], size: [23, 1.8, .16] }, { position: [0, 25.5, 9], size: [25, 1.5, 8] },
+      { position: [0, 21.5, 4.45], size: [23, 1.8, .16] }, megaRoofDeck,
     ]} />
     <Boxes color={accent} glow night={night} items={[
-      { position: [0, 24.7, 9], size: [29, .35, 10] },
+      megaRoofFascia,
       ...megaPracticalPositions.map(position => ({ position, size: [.12, 17, .15] as Vec3 })),
       { position: [0, 19.4, 5.5], size: [11.5, .13, .15] },
     ]} />

@@ -14,6 +14,14 @@ const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
 const { cameraPosition, cameraViews, createSceneCamera } = await sourceModule('../src/camera.ts')
 const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = await sourceModule('../src/lighting.ts')
+const { createMegaRoofRibs, megaRoofDeck, megaRoofFascia, megaRoofRibHeight, megaRoofRibY, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
+const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
+const fasciaBounds = verticalBounds(megaRoofFascia), deckBounds = verticalBounds(megaRoofDeck)
+assert(fasciaBounds.bottom > megaRoofSupportTop, 'Mega roof fascia clears the support beam')
+assert(deckBounds.bottom > fasciaBounds.top, 'Mega roof deck clears the accent fascia')
+const roofRibs = createMegaRoofRibs()
+assert(roofRibs.length > 15, 'Mega roof keeps its strong repeated-fin silhouette')
+assert(megaRoofRibY - megaRoofRibHeight / 2 > deckBounds.top, 'Mega roof ribs clear the deck instead of interpenetrating it')
 for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(weatherLighting)) {
   const fog = sceneFog(time, weather, '#243c54')
   const baseline = weatherLighting[weather]
