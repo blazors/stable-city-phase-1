@@ -5,7 +5,9 @@ import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
-import { Atmosphere, atmospherePalettes, sunDirection, type Weather } from './Atmosphere'
+import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
+import { Rain } from './Precipitation'
+import { rainBudgets } from './rain'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
 import { createMegaRoofRibs, megaRoofDeck, megaRoofFascia } from './megaGeometry'
@@ -25,7 +27,7 @@ const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dp
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
-function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean }) {
+function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false, wet = false }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean; wet?: boolean }) {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     if (!ref.current) return
@@ -43,7 +45,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
   }, [items])
   return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={!glow} receiveShadow={!glow}>
     {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
-    <meshStandardMaterial color={color} roughness={glow ? .45 : .82} metalness={glow ? .15 : .04} emissive={glow ? color : '#000000'} emissiveIntensity={glow ? (night ? 1.8 : .08) : 0} />
+    <meshStandardMaterial color={color} roughness={glow ? .45 : wet ? .30 : .82} metalness={glow ? .15 : wet ? .10 : .04} emissive={glow ? color : '#000000'} emissiveIntensity={glow ? (night ? 1.8 : .08) : 0} />
   </instancedMesh>
 }
 
@@ -121,18 +123,19 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
 function Water({ time, weather }: { time: TimeOfDay; weather: Weather }) {
   const material = useRef<ShaderMaterial>(null)
   const uniforms = useMemo(() => {
-    const p = atmospherePalettes[time]
-    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uReflection: { value: weather === 'haze' ? .25 : .7 } }
+    const p = environmentPalette(time, weather)
+    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uReflection: { value: weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 } }
   }, [time, weather])
   useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.elapsedTime })
   return <mesh position={[0, -1.85, 0]} rotation-x={-Math.PI / 2}>
     <planeGeometry args={[20000, 20000]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`varying vec3 world;
       void main(){ world=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0); }`}
-      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection;
+      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain;
       ${riverShader}
       void main(){
         float ripple=sin(world.x*.38+sin(world.z*.3)+uTime*.4)*sin(world.z*.8-uTime*.3);
+        ripple+=uRain*sin(world.x*2.1+uTime*2.8)*sin(world.z*2.7-uTime*2.3)*.35;
         float riverCenter=riverCenterAt(world.x);
         float riverWidth=riverWidthAt(world.x);
         float extent=1.0-smoothstep(250.0,261.0,abs(world.x));
@@ -185,7 +188,8 @@ function Ground({ time, weather }: { time: TimeOfDay; weather: Weather }) {
     {/* Keep the structural slab below the paving surface to avoid coplanar depth fighting. */}
     <Boxes color="#4e6668" items={[{ position: [0, -1.2, 0], size: [83, 2.3, 83] }]} />
     <Boxes color="#788a83" items={[{ position: [0, -.12, 0], size: [81, .24, 81] }, ...details.paving]} />
-    <Boxes color="#3e5359" items={details.road} />
+    <Boxes color={weather === 'rain' ? '#2e424b' : '#3e5359'} items={details.road} wet={weather === 'rain'} />
+    {weather === 'rain' && <RainPuddles night={night} />}
     <Boxes color="#abb9ac" items={details.markings} />
     <Boxes color="#738c87" items={details.supports} />
     <Boxes color="#f2c17e" items={details.lamps} glow night={night} />
@@ -194,12 +198,17 @@ function Ground({ time, weather }: { time: TimeOfDay; weather: Weather }) {
   </>
 }
 
-function MetropolitanLandscape({ night }: { night: boolean }) {
+function RainPuddles({ night }: { night: boolean }) {
+  const patches = useMemo(() => [-36, -18, 0, 18, 36].flatMap((x, i) => [-25, -9, 8, 25].map((z, j) => ({ position: [x + (j % 2 ? .55 : -.55), .066, z + i * .19] as Vec3, size: [1.1, .012, 2.8 + (i % 3)] as Vec3 }))), [])
+  return <Boxes items={patches} color={night ? '#7d7865' : '#718793'} wet />
+}
+
+function MetropolitanLandscape({ night, weather }: { night: boolean; weather: Weather }) {
   return <>
     <Boxes items={metropolis.land} color="#778782" />
     <Boxes items={metropolis.parks} color="#526f56" />
     <Boxes items={metropolis.paths} color="#a9ac96" />
-    <Boxes items={metropolis.roads} color="#485f65" />
+    <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
     <Boxes items={metropolis.buildings} />
     <Boxes items={metropolis.roofs} color="#8a9c97" />
     <Boxes items={metropolis.terraces} />
@@ -293,7 +302,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
   onUpdate: (metrics: RenderMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
   const startedAt = useRef(performance.now())
-  const p = atmospherePalettes[time], night = time === 'night', config = qualityConfig[quality]
+  const p = environmentPalette(time, weather), night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
   const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
   const fog = sceneFog(time, weather, p.haze)
@@ -318,7 +327,8 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
-    <MetropolitanLandscape night={night} />
+    <MetropolitanLandscape night={night} weather={weather} />
+    {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
     <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}

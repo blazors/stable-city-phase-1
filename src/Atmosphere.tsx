@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BackSide, Color, Vector3, type Mesh, type ShaderMaterial } from 'three'
 import type { TimeOfDay } from './city'
+import { rainPalettes } from './rain'
 
-export type Weather = 'clear' | 'clouds' | 'haze'
-export const weatherLabels: Record<Weather, string> = { clear: '晴空光晕', clouds: '层云晚霞', haze: '薄雾柔光' }
+export type Weather = 'clear' | 'clouds' | 'haze' | 'rain'
+export const weatherLabels: Record<Weather, string> = { clear: '晴空光晕', clouds: '层云晚霞', haze: '薄雾柔光', rain: '冷雨湿城' }
 export const weatherDescriptions: Record<Weather, string> = {
   clear: '少云天空与柔和日晕；夜间转为月晕。',
   clouds: '缓慢流动的层云，随白昼、日落和夜晚改变光色。',
   haze: '更柔和的光照与远景薄雾，保留近景轮廓。',
+  rain: '冷灰阴云、分层雨丝与湿润路面；暖灯映入局部积水。',
 }
 
 // Environment owns light direction and colour; themes never rebuild the city.
@@ -17,6 +19,10 @@ export const atmospherePalettes = {
   sunset: { zenith: '#535b86', horizon: '#e8b69a', haze: '#ada1a4', water: '#4a6778', sun: '#ffc183', ambient: '#b1c1dc', cloud: '#f7c09c', shadow: '#454c6e', direction: [-.58, .23, .72], power: 4.0 },
   night: { zenith: '#0c182d', horizon: '#344a66', haze: '#243c54', water: '#183342', sun: '#bed5f1', ambient: '#819dc7', cloud: '#7d94b3', shadow: '#263c59', direction: [.55, .3, .78], power: 1.2 },
 } satisfies Record<TimeOfDay, { zenith: string; horizon: string; haze: string; water: string; sun: string; ambient: string; cloud: string; shadow: string; direction: number[]; power: number }>
+
+export function environmentPalette(time: TimeOfDay, weather: Weather) {
+  return weather === 'rain' ? { ...atmospherePalettes[time], ...rainPalettes[time] } : atmospherePalettes[time]
+}
 
 export function sunDirection(time: TimeOfDay) {
   const [x, y, z] = atmospherePalettes[time].direction
@@ -35,7 +41,7 @@ const vertexShader = `
 const fragmentShader = `
   varying vec3 vDirection;
   uniform vec3 uZenith, uHorizon, uSunColor, uCloud, uShadow, uSun;
-  uniform float uTime, uCoverage, uHaze, uNight, uSunset, uDetail;
+  uniform float uTime, uCoverage, uHaze, uNight, uSunset, uDetail, uRain;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
     vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -57,11 +63,11 @@ const fragmentShader = `
     float aureole = exp(-angle*angle/ .014) * .72 + exp(-angle*angle/ .15) * .19;
     // A faint 22-degree halo, anchored to the actual sun rather than the screen.
     float halo = exp(-pow((angle-.384)/.024, 2.0)) * .055 * (1.0-uHaze*.7);
-    sky += uSunColor * (aureole + halo) * mix(1.0, .3, uNight) * smoothstep(0.0, .04, height);
+    sky += uSunColor * (aureole + halo) * mix(1.0, .04, uRain) * mix(1.0, .3, uNight) * smoothstep(0.0, .04, height);
     // Warm low cloud layers belong to the sunward horizon.
-    sky += uSunColor * uSunset * exp(-height*7.0) * pow(max(cosine,0.0),3.0) * .24;
+    sky += uSunColor * uSunset * exp(-height*7.0) * pow(max(cosine,0.0),3.0) * .24 * (1.0-uRain*.92);
     float disc = 1.0-smoothstep(.012, .017, angle);
-    sky = mix(sky, uSunColor*2.7, disc);
+    sky = mix(sky, uSunColor*2.7, disc*(1.0-uRain));
 
     // Hemisphere mapping is stable when orbiting; no camera-facing cloud cards.
     vec2 p = d.xz / (height + .24);
@@ -73,7 +79,7 @@ const fragmentShader = `
     float edge = (1.0-smoothstep(.12, .6, density))*density;
     float sunSide = pow(max(cosine, 0.0), 5.0);
     vec3 cloud = mix(uShadow, uCloud, clamp(.16 + body*.26 + sunSide*.5, 0.0, 1.0));
-    cloud += uSunColor*edge*sunSide*.9*(1.0-uNight*.8);
+    cloud += uSunColor*edge*sunSide*.9*(1.0-uNight*.8)*(1.0-uRain*.94);
     sky = mix(sky, cloud, density*.82);
     float wisps = smoothstep(.58, .76, fbm(p*vec2(1.8, 9.0)+drift*.4+45.0));
     sky = mix(sky, uCloud, wisps*.15*smoothstep(.03,.3,height)*(1.0-uNight*.65)*(.2+uCoverage*.8));
@@ -90,14 +96,15 @@ export function Atmosphere({ time, weather, lowDetail }: { time: TimeOfDay; weat
   const motion = useRef(true)
   const elapsed = useRef(0)
   const uniforms = useMemo(() => {
-    const p = atmospherePalettes[time]
+    const p = environmentPalette(time, weather)
     return {
       uZenith: { value: new Color(p.zenith) }, uHorizon: { value: new Color(p.horizon) },
       uSunColor: { value: new Color(p.sun) }, uCloud: { value: new Color(p.cloud) },
       uShadow: { value: new Color(p.shadow) }, uSun: { value: sunDirection(time) },
       uTime: { value: 0 }, uNight: { value: time === 'night' ? 1 : 0 }, uSunset: { value: time === 'sunset' ? 1 : 0 },
-      uCoverage: { value: weather === 'clouds' ? 1 : weather === 'haze' ? .55 : 0 },
-      uHaze: { value: weather === 'haze' ? 1 : .12 }, uDetail: { value: lowDetail ? 0 : 1 },
+      uCoverage: { value: weather === 'rain' ? 1.3 : weather === 'clouds' ? 1 : weather === 'haze' ? .55 : 0 },
+      uRain: { value: weather === 'rain' ? 1 : 0 },
+      uHaze: { value: weather === 'rain' ? .55 : weather === 'haze' ? 1 : .12 }, uDetail: { value: lowDetail ? 0 : 1 },
     }
   }, [time, weather, lowDetail])
   useEffect(() => {

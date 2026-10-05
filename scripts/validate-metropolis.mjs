@@ -32,6 +32,7 @@ for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(
   } else assert.deepEqual(fog, { color: '#243c54', near: baseline.fogNear, far: baseline.fogFar }, `${time}/${weather}: original fog retained`)
 }
 assert.deepEqual(sceneFog('night', 'clear', '#abcdef'), { color: '#abcdef', near: 340, far: 920 }, 'leaving night haze restores caller palette and clear distance')
+assert.deepEqual(weatherLighting.rain, { direct: .40, fill: .98, fogNear: 270, fogFar: 780 }, 'rain follows the authored visibility and lighting budget')
 assert(weatherLighting.clear.direct > weatherLighting.clouds.direct && weatherLighting.clouds.direct > weatherLighting.haze.direct, 'weather softens direct light progressively')
 assert(weatherLighting.haze.fogNear < weatherLighting.clouds.fogNear && weatherLighting.clouds.fogNear < weatherLighting.clear.fogNear, 'weather depth contracts progressively')
 for (const weather of Object.values(weatherLighting)) {
