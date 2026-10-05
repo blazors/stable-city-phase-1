@@ -7,6 +7,7 @@ import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
+import { LensWeather } from './LensWeather'
 import { rainBudgets } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
@@ -368,6 +369,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <WebGLGuard onError={onError} />
+    <LensWeather time={time} weather={weather} quality={quality} mode={mode} />
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }

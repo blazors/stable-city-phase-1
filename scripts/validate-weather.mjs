@@ -70,4 +70,40 @@ assert.match(scene, /count=\{snowBudgets\[quality\]\}/, 'all qualities retain sn
 assert.match(scene, /function SnowSurfaces[\s\S]*?<planeGeometry \/>/, 'snow cover uses a low-triangle instanced plane batch')
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 assert.match(app, /Object\.hasOwn\(weatherLabels, persistedUi\.weather\)/, 'stored weather validates against available options')
-console.log('Rain and snow buffers, budgets, palettes, surface clearance, occlusion and persistence contracts passed.')
+const lensSource = fs.readFileSync(new URL('../src/weatherLens.ts', import.meta.url), 'utf8')
+const lensOutput = ts.transpileModule(lensSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+const { lensBudgets, lensWeatherProfiles, lensSafeHalfSize, lensEdgeMask, lensStrength } = await import(`data:text/javascript;base64,${Buffer.from(lensOutput).toString('base64')}`)
+assert.deepEqual(Object.keys(lensWeatherProfiles).sort(), ['clear', 'clouds', 'haze', 'rain', 'snow'])
+assert.deepEqual(lensSafeHalfSize, [.30, .32])
+for (let x = 20; x <= 80; x++) for (let y = 18; y <= 82; y++) {
+  assert(Math.abs(lensEdgeMask(x / 100, y / 100)) < 1e-20, 'central 60% x 64% remains transparent')
+}
+for (const [u, v] of [[0, 0], [1, 1], [0, .5], [.5, 1]]) assert.equal(lensEdgeMask(u, v), 1)
+assert(lensEdgeMask(.15, .5) > 0 && lensEdgeMask(.15, .5) < 1, 'edge has a smooth outward feather')
+for (const profile of Object.values(lensWeatherProfiles)) for (const value of Object.values(profile)) {
+  assert(Number.isFinite(value) && value >= 0 && value <= .36, 'lens weather stays bounded')
+}
+assert(lensWeatherProfiles.rain.rain > 0 && lensWeatherProfiles.rain.frost === 0)
+assert(lensWeatherProfiles.snow.frost > 0 && lensWeatherProfiles.snow.rain === 0)
+assert(lensWeatherProfiles.haze.dew > lensWeatherProfiles.rain.dew)
+assert(lensWeatherProfiles.clear.glow <= .025 && lensWeatherProfiles.clouds.glow <= .015)
+const qualities = ['high', 'auto', 'balanced', 'low']
+for (let i = 1; i < qualities.length; i++) {
+  const previous = lensBudgets[qualities[i - 1]], current = lensBudgets[qualities[i]]
+  assert(previous.detail >= current.detail && previous.columns >= current.columns && previous.rows >= current.rows)
+}
+assert.equal(lensStrength('day', 'overview'), 1)
+assert.equal(lensStrength('day', 'mega'), .8)
+assert.equal(lensStrength('night', 'mega'), .52)
+const lens = fs.readFileSync(new URL('../src/LensWeather.tsx', import.meta.url), 'utf8')
+assert.match(lens, /gl_Position = vec4\(position.xy, 0.0, 1.0\)/, 'lens is screen-space')
+assert.match(lens, /renderOrder=\{1000\} raycast=\{\(\) => null\}/, 'lens does not intercept interaction')
+assert.match(lens, /transparent depthTest=\{false\} depthWrite=\{false\}/, 'lens never affects scene depth')
+assert.match(lens, /if\(edge<=0.0\) discard/, 'protected center skips lens fragments')
+assert.match(lens, /if \(motion.current\) elapsed.current \+= Math.min\(delta, \.05\)/, 'reduced motion freezes lens time')
+assert.match(lens, /preference.addEventListener\('change', update\)/, 'runtime reduced motion changes are observed')
+assert.match(lens, /preference.removeEventListener\('change', update\)/, 'preference listener is cleaned up')
+assert.doesNotMatch(lens, /Math\.random|WebGLRenderTarget|camera\.position\.set|camera\.lookAt|setInterval/, 'lens does not mutate camera or allocate a render target')
+assert.match(lens, /sun.z < 0 \? 1 : 0/, 'sun behind camera cannot create a lens glow')
+assert.match(scene, /<LensWeather time=\{time\} weather=\{weather\} quality=\{quality\} mode=\{mode\} \/>/, 'both scene modes share lens integration')
+console.log('Rain, snow and weather lens buffers, budgets, protected center, preference, depth and persistence contracts passed.')
