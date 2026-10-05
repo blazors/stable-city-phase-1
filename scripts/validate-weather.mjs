@@ -34,6 +34,40 @@ assert.match(precipitation, /distance\(cameraPosition,p\)/, 'world-space rain fa
 assert.match(precipitation, /19\.0\+aLayer\*4\.0/, 'near streaks fall faster than far streaks')
 assert.match(precipitation, /\.65\+aLayer\*\.75/, 'near streaks are longer than far streaks')
 assert.match(precipitation, /\.12\+aLayer\*\.035/, 'far streaks remain fainter')
+const snowSource = fs.readFileSync(new URL('../src/snow.ts', import.meta.url), 'utf8')
+const snowOutput = ts.transpileModule(snowSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+const { snowBudgets, snowPalettes, snowCaps, snowRoadEdges } = await import(`data:text/javascript;base64,${Buffer.from(snowOutput).toString('base64')}`)
+assert.deepEqual(snowBudgets, { high: 1600, auto: 1200, balanced: 1000, low: 400 })
+for (const count of Object.values(snowBudgets)) {
+  const a = createRainAttributes(count, 8105), b = createRainAttributes(count, 8105)
+  assert.deepEqual(a, b, 'snow reuses deterministic three-layer world-box attributes')
+  const counts = [0, 0, 0]
+  for (let i = 0; i < count; i++) counts[a.layer[i * 2]]++
+  assert.deepEqual(counts, [Math.round(count * .30), Math.round(count * .55), Math.round(count * .15)], 'snow is near sparse / middle dominant / far small')
+}
+for (const palette of Object.values(snowPalettes)) {
+  for (const color of Object.values(palette)) assert.match(color, /^#[a-f\d]{6}$/i)
+  assert(parseInt(palette.water.slice(1, 3), 16) < 60, 'snow river remains dark')
+}
+const surface = { position: [10, 8, 20], size: [4, 2, 6] }
+const original = structuredClone(surface), [cap] = snowCaps([surface])
+assert.deepEqual(surface, original, 'snow overlays never mutate authoritative geometry')
+assert(cap.position[1] - cap.size[1] / 2 > surface.position[1] + surface.size[1] / 2, 'snow caps clear the receiver top')
+assert.equal(cap.size[1], .10, 'thin snow preserves roof silhouette')
+for (const road of [{ position: [0, .025, 0], size: [3, .05, 78] }, { position: [0, .035, 0], size: [78, .05, 3] }]) {
+  const edges = snowRoadEdges([road])
+  assert.equal(edges.length, 2)
+  const axis = road.size[0] < road.size[2] ? 0 : 2
+  assert(edges.every(edge => Math.abs(edge.position[axis]) - edge.size[axis] / 2 > 1), 'snow road edges leave the central driving lane dark')
+}
+assert.match(precipitation, /<points frustumCulled=\{false\}>/, 'snow uses a single point batch')
+assert.match(precipitation, /gl_PointCoord/, 'snowflakes have soft round silhouettes')
+assert.match(precipitation, /1\.8\+aLayer\*1\.6/, 'near snowflakes are larger')
+assert.match(precipitation, /sin\(aPhase\*6\.283\+uTime\*\.22\)/, 'snow has bounded light wind')
+const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
+assert.match(scene, /snowCaps\(\[megaRoofDeck, \.\.\.createMegaRoofRibs\(\)\]\)/, 'snow follows the separate hero roof ribs')
+assert.match(scene, /count=\{snowBudgets\[quality\]\}/, 'all qualities retain snow identity')
+assert.match(scene, /function SnowSurfaces[\s\S]*?<planeGeometry \/>/, 'snow cover uses a low-triangle instanced plane batch')
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 assert.match(app, /Object\.hasOwn\(weatherLabels, persistedUi\.weather\)/, 'stored weather validates against available options')
-console.log('Weather rain buffers, budgets, palette, occlusion and persistence contracts passed.')
+console.log('Rain and snow buffers, budgets, palettes, surface clearance, occlusion and persistence contracts passed.')

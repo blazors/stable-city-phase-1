@@ -6,6 +6,7 @@ export const weatherLighting = {
   clouds: { direct: .8, fill: 1.08, fogNear: 300, fogFar: 840 },
   haze: { direct: .55, fill: 1.12, fogNear: 190, fogFar: 620 },
   rain: { direct: .40, fill: .98, fogNear: 270, fogFar: 780 },
+  snow: { direct: .48, fill: 1.02, fogNear: 245, fogFar: 820 },
 }
 export const timeLighting: Record<TimeOfDay, { hemisphere: number; fill: number }> = {
   day: { hemisphere: 1.8, fill: .75 },

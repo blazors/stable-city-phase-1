@@ -6,14 +6,27 @@ import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
-import { Rain } from './Precipitation'
+import { Rain, Snow } from './Precipitation'
 import { rainBudgets } from './rain'
+import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
 import { createMegaRoofRibs, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
+const snowSurfaces = [
+  ...snowCaps(city.buildings.map(b => ({ position: [b.x, b.height + .16, b.z] as Vec3, size: [b.width + .22, .32, b.depth + .22] as Vec3 }))),
+  ...snowCaps(city.buildings.map(b => ({ position: [b.x, b.height + .7, b.z] as Vec3, size: [b.width * .57, 1.1, b.depth * .58] as Vec3 }))),
+  ...snowCaps(metropolis.roofs), ...snowCaps(metropolis.parks),
+  ...snowRoadEdges(metropolis.roads),
+  ...snowCaps([megaRoofDeck, ...createMegaRoofRibs()]),
+  ...snowCaps(city.blocks.filter(b => b.kind === 'void').map(b => ({ position: [b.x, .12, b.z] as Vec3, size: [14, .24, 14] as Vec3 }))),
+  ...snowRoadEdges([-36, -18, 0, 18, 36].flatMap(v => [
+    { position: [v, .025, 0] as Vec3, size: [v === 0 ? 4.6 : 3, .05, 78] as Vec3 },
+    { position: [0, .035, v] as Vec3, size: [78, .05, 3] as Vec3 },
+  ])),
+]
 export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string }
@@ -46,6 +59,27 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
   return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={!glow} receiveShadow={!glow}>
     {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
     <meshStandardMaterial color={color} roughness={glow ? .45 : wet ? .30 : .82} metalness={glow ? .15 : wet ? .10 : .04} emissive={glow ? color : '#000000'} emissiveIntensity={glow ? (night ? 1.8 : .08) : 0} />
+  </instancedMesh>
+}
+
+function SnowSurfaces({ items, color }: { items: Box[]; color: string }) {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const object = new Object3D()
+    items.forEach((item, i) => {
+      object.position.set(...item.position)
+      object.rotation.set(-Math.PI / 2, 0, 0)
+      object.scale.set(item.size[0], item.size[2], 1)
+      object.updateMatrix()
+      ref.current!.setMatrixAt(i, object.matrix)
+    })
+    ref.current.instanceMatrix.needsUpdate = true
+    ref.current.computeBoundingSphere()
+  }, [items])
+  return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} receiveShadow>
+    <planeGeometry />
+    <meshStandardMaterial color={color} roughness={.94} metalness={0} />
   </instancedMesh>
 }
 
@@ -124,7 +158,7 @@ function Water({ time, weather }: { time: TimeOfDay; weather: Weather }) {
   const material = useRef<ShaderMaterial>(null)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uReflection: { value: weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 } }
+    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 } }
   }, [time, weather])
   useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.elapsedTime })
   return <mesh position={[0, -1.85, 0]} rotation-x={-Math.PI / 2}>
@@ -329,6 +363,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clouds', quality 
     <Ground time={time} weather={weather} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} weather={weather} />
     {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
+    {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
     <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
