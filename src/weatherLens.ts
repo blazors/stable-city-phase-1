@@ -11,7 +11,6 @@ export const lensBudgets = {
 
 export const lensWeatherProfiles = {
   clear: { rain: 0, frost: 0, dew: 0, glow: .025 },
-  clouds: { rain: 0, frost: 0, dew: 0, glow: .012 },
   haze: { rain: 0, frost: 0, dew: .11, glow: .018 },
   rain: { rain: .34, frost: 0, dew: .025, glow: 0 },
   snow: { rain: 0, frost: .27, dew: .035, glow: 0 },

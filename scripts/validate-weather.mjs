@@ -69,11 +69,11 @@ assert.match(scene, /snowCaps\(\[megaRoofDeck, \.\.\.createMegaRoofRibs\(\)\]\)/
 assert.match(scene, /count=\{snowBudgets\[quality\]\}/, 'all qualities retain snow identity')
 assert.match(scene, /function SnowSurfaces[\s\S]*?<planeGeometry \/>/, 'snow cover uses a low-triangle instanced plane batch')
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
-assert.match(app, /Object\.hasOwn\(weatherLabels, persistedUi\.weather\)/, 'stored weather validates against available options')
+assert.match(app, /migrateWeather\(persistedUi\?\.weather\)/, 'stored weather migrates legacy options')
 const lensSource = fs.readFileSync(new URL('../src/weatherLens.ts', import.meta.url), 'utf8')
 const lensOutput = ts.transpileModule(lensSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
 const { lensBudgets, lensWeatherProfiles, lensSafeHalfSize, lensEdgeMask, lensStrength } = await import(`data:text/javascript;base64,${Buffer.from(lensOutput).toString('base64')}`)
-assert.deepEqual(Object.keys(lensWeatherProfiles).sort(), ['clear', 'clouds', 'haze', 'rain', 'snow'])
+assert.deepEqual(Object.keys(lensWeatherProfiles).sort(), ['clear', 'haze', 'rain', 'snow'])
 assert.deepEqual(lensSafeHalfSize, [.30, .32])
 for (let x = 20; x <= 80; x++) for (let y = 18; y <= 82; y++) {
   assert(Math.abs(lensEdgeMask(x / 100, y / 100)) < 1e-20, 'central 60% x 64% remains transparent')
@@ -86,7 +86,7 @@ for (const profile of Object.values(lensWeatherProfiles)) for (const value of Ob
 assert(lensWeatherProfiles.rain.rain > 0 && lensWeatherProfiles.rain.frost === 0)
 assert(lensWeatherProfiles.snow.frost > 0 && lensWeatherProfiles.snow.rain === 0)
 assert(lensWeatherProfiles.haze.dew > lensWeatherProfiles.rain.dew)
-assert(lensWeatherProfiles.clear.glow <= .025 && lensWeatherProfiles.clouds.glow <= .015)
+assert(lensWeatherProfiles.clear.glow <= .025)
 const qualities = ['high', 'auto', 'balanced', 'low']
 for (let i = 1; i < qualities.length; i++) {
   const previous = lensBudgets[qualities[i - 1]], current = lensBudgets[qualities[i]]
@@ -106,4 +106,62 @@ assert.match(lens, /preference.removeEventListener\('change', update\)/, 'prefer
 assert.doesNotMatch(lens, /Math\.random|WebGLRenderTarget|camera\.position\.set|camera\.lookAt|setInterval/, 'lens does not mutate camera or allocate a render target')
 assert.match(lens, /sun.z < 0 \? 1 : 0/, 'sun behind camera cannot create a lens glow')
 assert.match(scene, /<LensWeather time=\{time\} weather=\{weather\} quality=\{quality\} mode=\{mode\} \/>/, 'both scene modes share lens integration')
-console.log('Rain, snow and weather lens buffers, budgets, protected center, preference, depth and persistence contracts passed.')
+const loadPureModule = async file => {
+  const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
+  const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString('base64')}`)
+}
+const { migrateWeather, migrateWeatherDraft, weatherSchemaVersion, weatherLabels } = await loadPureModule('../src/weather.ts')
+assert.deepEqual(Object.keys(weatherLabels), ['clear', 'rain', 'snow', 'haze'], 'four atmosphere choices')
+for (const old of ['clear', 'clouds', 'rain', 'snow', 'haze']) {
+  assert.equal(migrateWeather(old), old === 'clouds' ? 'clear' : old, 'legacy weather maps to a usable preset')
+}
+for (const invalid of [undefined, null, 1, {}, 'unknown']) assert.equal(migrateWeather(invalid), 'clear')
+const oldApproval = { weather: 'haze', checked: ['明暗与色彩层级'], qcResult: true, qcIssues: ['old'], themeOffResult: true, themeMatrixResult: { harbor: true }, theme: 'harbor', view: 'quality' }
+const migratedApproval = migrateWeatherDraft(oldApproval)
+assert.equal(migratedApproval.weatherVersion, weatherSchemaVersion)
+assert.deepEqual(migratedApproval.checked, [], 'old visual confirmations are invalidated')
+assert.equal(migratedApproval.qcResult, null)
+assert.deepEqual(migratedApproval.qcIssues, [])
+assert.equal(migratedApproval.themeOffResult, null)
+assert.equal(migratedApproval.themeMatrixResult, null)
+assert.equal(migratedApproval.theme, oldApproval.theme, 'migration preserves unrelated user choices')
+assert.equal(migratedApproval.view, oldApproval.view)
+const currentApproval = { ...oldApproval, weatherVersion: weatherSchemaVersion }
+assert.deepEqual(migrateWeatherDraft(currentApproval), currentApproval, 'current-version review survives reload')
+assert.deepEqual(oldApproval.checked, ['明暗与色彩层级'], 'migration does not mutate the supplied draft')
+assert.equal(migrateWeatherDraft({ ...currentApproval, weather: 'clouds' }).qcResult, null, 'legacy value cannot carry a current-version approval')
+const { heightFogTop, heightFogFalloff, heightFogBudgets, heightFogDensity, heightFogOpticalDepth, heightFogPrimitive } = await loadPureModule('../src/heightFogModel.ts')
+assert.equal(heightFogTop, 17, 'both cameras share a fixed 17-unit world fog top')
+assert(heightFogDensity('mega') < heightFogDensity('overview'), 'close-up lowers optical density, not the fog top')
+assert.equal(heightFogBudgets.low, 0, 'LOW omits animated breakup but retains analytic fog')
+assert(heightFogBudgets.high >= heightFogBudgets.auto && heightFogBudgets.auto >= heightFogBudgets.balanced && heightFogBudgets.balanced >= heightFogBudgets.low)
+for (const point of [heightFogTop, heightFogTop - heightFogFalloff]) {
+  assert(Math.abs(heightFogPrimitive(point - 1e-5) - heightFogPrimitive(point + 1e-5)) < .0001, 'fog density integral is continuous')
+}
+const density = heightFogDensity('overview')
+assert.equal(heightFogOpticalDepth([0, 35, -80], [0, 26, 0], density), 0, 'upper hero remains free of low fog')
+const groundFogDepth = heightFogOpticalDepth([0, 35, -80], [0, 0, 0], density)
+assert(groundFogDepth > .65 && groundFogDepth < 1.5, 'ground receives a readable fog layer without washing out the city')
+assert.equal(heightFogOpticalDepth([0, 0, 0], [0, 0, 0], density), 0, 'coincident endpoint has zero optical depth')
+for (const a of [[0, 112, -272], [0, 36, -60], [0, 17, 0], [0, 9, 0]]) for (const b of [[5, 0, 30], [5, 17, 30], [5, 31, 30], [5, a[1], 30]]) {
+  const optical = heightFogOpticalDepth(a, b, density)
+  assert(Number.isFinite(optical) && optical >= 0, 'inside/outside/horizontal rays remain finite')
+  assert(Math.abs(optical - heightFogOpticalDepth(b, a, density)) < 1e-8, 'optical depth is direction invariant')
+  // Independently integrate the piecewise density rather than copying its closed form.
+  const steps = 8000, distance = Math.hypot(...b.map((value, axis) => value - a[axis]))
+  let numerical = 0
+  for (let i = 0; i < steps; i++) {
+    const y = a[1] + (b[1] - a[1]) * (i + .5) / steps
+    numerical += Math.max(0, Math.min(1, (heightFogTop - y) / heightFogFalloff)) * distance / steps * density
+  }
+  assert(Math.abs(optical - numerical) < 1e-5, 'analytic depth matches numerical path integration')
+}
+const heightFog = fs.readFileSync(new URL('../src/HeightFog.tsx', import.meta.url), 'utf8')
+assert.match(heightFog, /instanceMatrix\*heightFogPosition/, 'world height accounts for instanced city transforms')
+assert.match(heightFog, /material\.onBeforeCompile = compile; material\.customProgramCacheKey = cache/, 'switching away restores material shaders')
+assert.match(heightFog, /preference\.removeEventListener\('change', update\)/, 'fog reduced-motion listener is disposed')
+assert.doesNotMatch(heightFog, /RenderTarget|DepthTexture|<mesh|setInterval|Math\.random/, 'analytic layer allocates no passes, geometry or CPU particles')
+assert.match(scene, /weather === 'haze' && <HeightFog color=\{fog.color\} mode=\{mode\} quality=\{quality\}/, 'both modes share the same layer integration')
+assert.match(scene, /applyHeightFog\(mix\(water/, 'water shader receives the same height fog')
+console.log('Rain, snow, lens and height fog behavior, numerical ray integration, quality, motion and persistence contracts passed.')

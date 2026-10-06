@@ -4,16 +4,9 @@ import { BackSide, Color, Vector3, type Mesh, type ShaderMaterial } from 'three'
 import type { TimeOfDay } from './city'
 import { rainPalettes } from './rain'
 import { snowPalettes } from './snow'
+import type { Weather } from './weather'
+export { weatherLabels, weatherDescriptions, type Weather } from './weather'
 
-export type Weather = 'clear' | 'clouds' | 'haze' | 'rain' | 'snow'
-export const weatherLabels: Record<Weather, string> = { clear: '晴空光晕', clouds: '层云晚霞', haze: '薄雾柔光', rain: '冷雨湿城', snow: '静雪冷城' }
-export const weatherDescriptions: Record<Weather, string> = {
-  clear: '少云天空与柔和日晕；夜间转为月晕。',
-  clouds: '缓慢流动的层云，随白昼、日落和夜晚改变光色。',
-  haze: '更柔和的光照与远景薄雾，保留近景轮廓。',
-  rain: '冷灰阴云、分层雨丝与湿润路面、局部积水。',
-  snow: '蓝灰雪云、轻风雪花与屋顶薄雪；深色道路和河水保留城市轮廓。',
-}
 
 // Environment owns light direction and colour; themes never rebuild the city.
 export const atmospherePalettes = {
@@ -104,7 +97,7 @@ export function Atmosphere({ time, weather, lowDetail }: { time: TimeOfDay; weat
       uSunColor: { value: new Color(p.sun) }, uCloud: { value: new Color(p.cloud) },
       uShadow: { value: new Color(p.shadow) }, uSun: { value: sunDirection(time) },
       uTime: { value: 0 }, uNight: { value: time === 'night' ? 1 : 0 }, uSunset: { value: time === 'sunset' ? 1 : 0 },
-      uCoverage: { value: weather === 'snow' ? 1.15 : weather === 'rain' ? 1.3 : weather === 'clouds' ? 1 : weather === 'haze' ? .55 : 0 },
+      uCoverage: { value: weather === 'snow' ? 1.15 : weather === 'rain' ? 1.3 : weather === 'haze' ? .55 : .65 },
       uRain: { value: weather === 'rain' || weather === 'snow' ? 1 : 0 },
       uHaze: { value: weather === 'snow' ? .65 : weather === 'rain' ? .55 : weather === 'haze' ? 1 : .12 }, uDetail: { value: lowDetail ? 0 : 1 },
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Scene, metropolitanBuildingCount, type QualityPreset, type RenderMetrics } from './CityScene'
 import { SceneBoundary } from './SceneBoundary'
 import { weatherLabels, weatherDescriptions, type Weather } from './Atmosphere'
+import { migrateWeather } from './weather'
 
 import { createStableCity, getStableCitySignature, validateStableCity, type TimeOfDay } from './city'
 import { ProductionPanel } from './ProductionPanel'
@@ -48,7 +49,7 @@ function WeatherPicker({ value, onChange }: { value: Weather; onChange: (next: W
 export function App() {
   const persistedUi = useRef(loadUiDraft()).current
   const [time, setTime] = useState<TimeOfDay>(() => persistedUi?.time ?? 'sunset')
-  const [weather, setWeather] = useState<Weather>(() => persistedUi?.weather && Object.hasOwn(weatherLabels, persistedUi.weather) ? persistedUi.weather : 'clouds')
+  const [weather, setWeather] = useState<Weather>(() => migrateWeather(persistedUi?.weather))
   const [mode, setMode] = useState<'overview' | 'mega'>(() => persistedUi?.mode ?? 'overview')
   const [theme, setTheme] = useState<ThemeName>(() => persistedUi?.theme ?? 'harbor')
   const [enabled, setEnabled] = useState(() => persistedUi?.enabled ?? true)
@@ -100,7 +101,7 @@ export function App() {
 
   function resetUiDraft() {
     clearUiDraft()
-    setTime('sunset'); setWeather('clouds'); setMode('overview'); setTheme('harbor'); setEnabled(true); setQuality('auto'); setView('overview'); setSelectedAsset('hero')
+    setTime('sunset'); setWeather('clear'); setMode('overview'); setTheme('harbor'); setEnabled(true); setQuality('auto'); setView('overview'); setSelectedAsset('hero')
     setDecisions(defaultDecisions); setChecked([]); setQcResult(null); setQcIssues([]); setThemeOffResult(null); setThemeMatrixResult(null)
     setSceneError(null)
   }

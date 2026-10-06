@@ -22,20 +22,21 @@ assert(deckBounds.bottom > fasciaBounds.top, 'Mega roof deck clears the accent f
 const roofRibs = createMegaRoofRibs()
 assert(roofRibs.length > 15, 'Mega roof keeps its strong repeated-fin silhouette')
 assert(megaRoofRibY - megaRoofRibHeight / 2 > deckBounds.top, 'Mega roof ribs clear the deck instead of interpenetrating it')
+assert.deepEqual(Object.keys(weatherLighting), ['clear', 'haze', 'rain', 'snow'], 'four consolidated weather modes have lighting')
 for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(weatherLighting)) {
   const fog = sceneFog(time, weather, '#243c54')
   const baseline = weatherLighting[weather]
   assert.equal(fog.near, baseline.fogNear, 'fog adjustment preserves the near-field boundary')
   if (time === 'night' && weather === 'haze') {
-    assert(fog.far > baseline.fogFar && fog.far < weatherLighting.clouds.fogFar, 'night haze retains skyline depth and remains denser than clouds')
+    assert.equal(fog.far, baseline.fogFar, 'night fog sea preserves the same upper-skyline aerial distance')
     assert.equal(fog.color, '#344c60', 'night haze uses the authored cool aerial perspective')
   } else assert.deepEqual(fog, { color: '#243c54', near: baseline.fogNear, far: baseline.fogFar }, `${time}/${weather}: original fog retained`)
 }
 assert.deepEqual(sceneFog('night', 'clear', '#abcdef'), { color: '#abcdef', near: 340, far: 920 }, 'leaving night haze restores caller palette and clear distance')
 assert.deepEqual(weatherLighting.rain, { direct: .40, fill: .98, fogNear: 270, fogFar: 780 }, 'rain follows the authored visibility and lighting budget')
 assert.deepEqual(weatherLighting.snow, { direct: .48, fill: 1.02, fogNear: 245, fogFar: 820 }, 'snow preserves authored near-field visibility')
-assert(weatherLighting.clear.direct > weatherLighting.clouds.direct && weatherLighting.clouds.direct > weatherLighting.haze.direct, 'weather softens direct light progressively')
-assert(weatherLighting.haze.fogNear < weatherLighting.clouds.fogNear && weatherLighting.clouds.fogNear < weatherLighting.clear.fogNear, 'weather depth contracts progressively')
+assert(weatherLighting.clear.direct > weatherLighting.haze.direct && weatherLighting.haze.direct > weatherLighting.rain.direct, 'weather softens direct light progressively')
+assert(weatherLighting.haze.fogNear > weatherLighting.clear.fogNear && weatherLighting.haze.fogFar > weatherLighting.clear.fogFar, 'fog sea keeps high skyline clear while its separate low layer hides streets')
 for (const weather of Object.values(weatherLighting)) {
   assert(weather.fogFar > weather.fogNear && weather.fogNear > 100, 'fog preserves near-field receivers')
   for (const time of Object.values(timeLighting)) assert(time.hemisphere * weather.fill > .4 && time.fill > 0, 'lighting preserves silhouette fill in every state')
