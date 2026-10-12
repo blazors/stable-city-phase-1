@@ -8,7 +8,7 @@ import { generateMetropolis, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
 import { LensWeather } from './LensWeather'
-import { rainBudgets } from './rain'
+import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
@@ -162,7 +162,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
   }, [time, weather, mode, quality])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -181,7 +181,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
     <planeGeometry args={[20000, 20000]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`varying vec3 world;
       void main(){ world=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0); }`}
-      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain;
+      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain; uniform float uIce;
       ${riverShader}
       ${heightFogGLSL}
       void main(){
@@ -194,13 +194,20 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
         float broken=pow(max(0.0,sin(world.x*.8+sin(world.z*1.1)+uTime*.4)),6.0);
         float glint=pow(max(0.0,ripple),14.0);
         float channel=(1.0-smoothstep(riverWidth-2.0,riverWidth+2.0,abs(world.z-riverCenter)))*extent;
-        vec3 water=uColor*(.83+.04*ripple*channel);
+        float freeze=channel*uIce;
+        vec3 water=uColor*(.83+.04*ripple*channel*(1.0-freeze*.92));
         water+=vec3(.65,.39,.14)*shore*broken*(.08+uNight*.18);
         water+=vec3(.19,.29,.34)*glint*.04*channel;
         vec3 viewDirection=normalize(cameraPosition-world);
         vec3 normal=normalize(vec3(sin(world.x*.2+uTime*.35)*.025,1.0,cos(world.z*.27-uTime*.3)*.045));
         float spec=pow(max(0.0,dot(reflect(-uSun,normal),viewDirection)),150.0);
         float shimmer=.4+.6*pow(max(0.0,sin(world.z*1.5+uTime*.6+sin(world.x*.9))),3.0);
+        spec*=1.0-freeze*.82;
+        // Only the curved river channel becomes static ice; the surrounding 20000-unit water plane remains water.
+        float iceGrain=.5+.5*sin(world.x*.23+sin(world.z*.11)*2.0)*sin(world.z*.31+world.x*.07);
+        vec3 ice=mix(vec3(.30,.43,.49),vec3(.53,.64,.68),iceGrain);
+        ice+=vec3(.04,.05,.055)*pow(max(0.0,sin(world.x*.67+world.z*.13)),18.0);
+        water=mix(water,ice,freeze*.96);
         water+=uSunColor*spec*shimmer*uReflection;
         gl_FragColor=vec4(applyHeightFog(mix(water,uHaze,smoothstep(420.0,950.0,distance(cameraPosition,world))),world),1.0);
         #include <tonemapping_fragment>
@@ -234,13 +241,14 @@ function Ground({ time, weather, mode, quality }: { time: TimeOfDay; weather: We
     for (let x = -36; x <= 36; x += 9) supports.push({ position: [x, 4.25, -30], size: [.6, 8.5, .6] })
     return { paving, road, markings, lamps, supports }
   }, [])
+  const roads = useMemo(() => [...details.road, ...metropolis.roads], [details])
   return <>
     <Water time={time} weather={weather} mode={mode} quality={quality} />
     {/* Keep the structural slab below the paving surface to avoid coplanar depth fighting. */}
     <Boxes color="#4e6668" items={[{ position: [0, -1.2, 0], size: [83, 2.3, 83] }]} />
     <Boxes color="#788a83" items={[{ position: [0, -.12, 0], size: [81, .24, 81] }, ...details.paving]} />
     <Boxes color={weather === 'rain' ? '#2e424b' : '#3e5359'} items={details.road} wet={weather === 'rain'} />
-    {weather === 'rain' && <RainPuddles night={night} />}
+    {weather === 'rain' && <RainPuddles night={night} quality={quality} roads={roads} />}
     <Boxes color="#abb9ac" items={details.markings} />
     <Boxes color="#738c87" items={details.supports} />
     <Boxes color="#f2c17e" items={details.lamps} glow night={night} />
@@ -249,9 +257,26 @@ function Ground({ time, weather, mode, quality }: { time: TimeOfDay; weather: We
   </>
 }
 
-function RainPuddles({ night }: { night: boolean }) {
-  const patches = useMemo(() => [-36, -18, 0, 18, 36].flatMap((x, i) => [-25, -9, 8, 25].map((z, j) => ({ position: [x + (j % 2 ? .55 : -.55), .066, z + i * .19] as Vec3, size: [1.1, .012, 2.8 + (i % 3)] as Vec3 }))), [])
-  return <Boxes items={patches} color={night ? '#7d7865' : '#718793'} wet />
+function RainPuddles({ night, quality, roads }: { night: boolean; quality: QualityPreset; roads: Box[] }) {
+  const patches = useMemo(() => rainPatches(roads, puddleBudgets[quality]), [roads, quality])
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const object = new Object3D()
+    patches.forEach((patch, i) => {
+      object.position.set(...patch.position)
+      object.rotation.set(-Math.PI / 2, 0, 0)
+      object.scale.set(patch.size[0], patch.size[2], 1)
+      object.updateMatrix()
+      ref.current!.setMatrixAt(i, object.matrix)
+    })
+    ref.current.instanceMatrix.needsUpdate = true
+    ref.current.computeBoundingSphere()
+  }, [patches])
+  return <instancedMesh ref={ref} args={[undefined, undefined, patches.length]} receiveShadow>
+    <planeGeometry />
+    <meshStandardMaterial color={night ? '#405965' : '#547582'} roughness={.24} metalness={.12} />
+  </instancedMesh>
 }
 
 function MetropolitanLandscape({ night, weather }: { night: boolean; weather: Weather }) {

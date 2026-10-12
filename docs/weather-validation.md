@@ -1,3 +1,19 @@
+# 天气氛围 V2 · 2026-10-12
+
+## 暴雨强化与冰封暴雪 Stage 2
+
+本阶段在不改变 StableCity、Metropolis 生成规则、相机或雾海结构的前提下，强化雨雪的空间辨识度。雨滴由单个 indexed ribbon batch 绘制：固定世界空间雨盒继续分为远/中/近三层，近层使用更宽的屏幕像素带、斜向下落和较宽较长的近滴；雨滴仍开启深度测试、关闭深度写入，因此建筑不会被整层透明雨幕盖住。HIGH/AUTO/BALANCED/LOW 雨滴上限为 2400/1600/1500/600，保持原粒子预算。
+
+雨天道路材质保持湿润粗糙度，并从核心路网与外围路网确定性生成不规则、大小不同的积水色块；积水与雨丝分别是一批 InstancedMesh 和一批 ribbon，阶段新增主场景 draw 不超过两项。积水是颜色/粗糙度近似，不代表真实 SSR、环境反射或雨水碰撞。
+
+雪天仍使用一个 Points batch，但以强横向风和屏幕空间方向性雪划强化暴雪感。HIGH/AUTO/BALANCED/LOW 雪花上限为 1600/1200/1000/400。屋顶、屋顶附属体、公园、道路边缘和巨构顶冠继续由一个薄雪实例批次覆盖，车行中央保持暗色。河道冰封写入既有 20000×20000 水面 shader，仅以 `riverCenterAt`/`riverWidthAt` 的曲线河道遮罩冻结河面；河道外仍保持水面，不铺整面冰层，也不增加 RenderTarget 或后处理 pass。
+
+雨、雪、水面和既有镜片层均监听 `prefers-reduced-motion: reduce`；偏好开启时冻结天气时间，静态湿路、积雪和河道冰封保留。LOW 保留天气身份和薄雪/冰封，只降低雨雪粒子与镜片细节预算。
+
+新增/更新验证：固定种子与三层雨丝、indexed ribbon 顶点/索引边界、雨/积水质量预算和非均匀路面采样、雪横风与方向性雪划、河道遮罩范围、单批渲染和无 RenderTarget 契约。源码契约、TypeScript/Vite 构建与数值测试不能替代真实浏览器中的 Shader 编译、视觉判断和设备帧率验收。
+
+本阶段验证命令：`pnpm validate`、`node scripts/validate-metropolis.mjs`、`node scripts/validate-weather.mjs`、`git diff --check`。
+
 # 天气氛围 V1 · 2026-09-21
 
 ## 雾海与合并天气第一验收点 · 2026-10-06
