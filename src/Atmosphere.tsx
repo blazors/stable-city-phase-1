@@ -55,9 +55,9 @@ const fragmentShader = `
     float cosine = clamp(dot(d, uSun), -1.0, 1.0);
     float angle = acos(cosine);
     vec3 sky = mix(uHorizon, uZenith, pow(smoothstep(0.0, .24, height), .65));
-    float aureole = exp(-angle*angle/ .014) * .72 + exp(-angle*angle/ .15) * .19;
-    // A faint 22-degree halo, anchored to the actual sun rather than the screen.
-    float halo = exp(-pow((angle-.384)/.024, 2.0)) * .055 * (1.0-uHaze*.7);
+    float aureole = exp(-angle*angle/ .010) * .58 + exp(-angle*angle/ .075) * .09;
+    // A restrained 22-degree halo, anchored to the actual sun rather than the screen.
+    float halo = exp(-pow((angle-.384)/.020, 2.0)) * .032 * (1.0-uHaze*.7);
     sky += uSunColor * (aureole + halo) * mix(1.0, .04, uRain) * mix(1.0, .3, uNight) * smoothstep(0.0, .04, height);
     // Warm low cloud layers belong to the sunward horizon.
     sky += uSunColor * uSunset * exp(-height*7.0) * pow(max(cosine,0.0),3.0) * .24 * (1.0-uRain*.92);
@@ -73,8 +73,19 @@ const fragmentShader = `
     density *= smoothstep(.025, .15, height);
     float edge = (1.0-smoothstep(.12, .6, density))*density;
     float sunSide = pow(max(cosine, 0.0), 5.0);
-    vec3 cloud = mix(uShadow, uCloud, clamp(.16 + body*.26 + sunSide*.5, 0.0, 1.0));
-    cloud += uSunColor*edge*sunSide*.9*(1.0-uNight*.8)*(1.0-uRain*.94);
+    float backLight = pow(max(-cosine, 0.0), 3.0);
+    float underside = (1.0-smoothstep(.06, .76, max(d.y, 0.0))) * smoothstep(.15, .72, density);
+    float lowFrequencySun = 0.0;
+    // HIGH/AUTO spend one extra low-frequency sunward sample; BALANCED/LOW reuse body/bands.
+    if (uDetail > 1.5) {
+      float lowCloud = smoothstep(.44, .72, noise(p*.62 + drift*.18 + vec2(4.7, 12.1)));
+      lowFrequencySun = lowCloud * sunSide;
+    }
+    float cloudLight = clamp(.12 + body*.24 + sunSide*.48 + lowFrequencySun*.20 - underside*.26, 0.0, 1.0);
+    vec3 cloud = mix(uShadow, uCloud, cloudLight);
+    cloud += uSunColor*edge*(sunSide*.62 + lowFrequencySun*.24)*(1.0-uNight*.88)*(1.0-uRain*.94);
+    cloud += uCloud*edge*backLight*.13*(1.0-uNight*.82)*(1.0-uRain*.94);
+    cloud = mix(cloud, uShadow, underside*.34*(1.0-uNight*.35));
     sky = mix(sky, cloud, density*.82);
     float wisps = smoothstep(.58, .76, fbm(p*vec2(1.8, 9.0)+drift*.4+45.0));
     sky = mix(sky, uCloud, wisps*.15*smoothstep(.03,.3,height)*(1.0-uNight*.65)*(.2+uCoverage*.8));
@@ -85,7 +96,9 @@ const fragmentShader = `
   }
 `
 
-export function Atmosphere({ time, weather, lowDetail }: { time: TimeOfDay; weather: Weather; lowDetail: boolean }) {
+type AtmosphereQuality = 'auto' | 'high' | 'balanced' | 'low'
+
+export function Atmosphere({ time, weather, lowDetail, quality = 'auto' }: { time: TimeOfDay; weather: Weather; lowDetail: boolean; quality?: AtmosphereQuality }) {
   const mesh = useRef<Mesh>(null)
   const material = useRef<ShaderMaterial>(null)
   const motion = useRef(true)
@@ -99,9 +112,9 @@ export function Atmosphere({ time, weather, lowDetail }: { time: TimeOfDay; weat
       uTime: { value: 0 }, uNight: { value: time === 'night' ? 1 : 0 }, uSunset: { value: time === 'sunset' ? 1 : 0 },
       uCoverage: { value: weather === 'snow' ? 1.15 : weather === 'rain' ? 1.3 : weather === 'haze' ? .55 : .65 },
       uRain: { value: weather === 'rain' || weather === 'snow' ? 1 : 0 },
-      uHaze: { value: weather === 'snow' ? .65 : weather === 'rain' ? .55 : weather === 'haze' ? 1 : .12 }, uDetail: { value: lowDetail ? 0 : 1 },
+      uHaze: { value: weather === 'snow' ? .65 : weather === 'rain' ? .55 : weather === 'haze' ? 1 : .12 }, uDetail: { value: quality === 'low' || lowDetail ? 0 : quality === 'balanced' ? 1 : 2 },
     }
-  }, [time, weather, lowDetail])
+  }, [time, weather, lowDetail, quality])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => { motion.current = !preference.matches }

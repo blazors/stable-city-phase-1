@@ -1,4 +1,4 @@
-import { addAfterEffect, Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { CameraShake, OrbitControls } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
@@ -33,13 +33,14 @@ const snowSurfaces = [
 export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string }
-export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number }
+export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number }
 export type QualityPreset = 'auto' | 'high' | 'balanced' | 'low'
-const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dpr: [number, number] }> = {
-  auto: { detail: 1, traffic: 16, dpr: [1, 1.5] },
-  high: { detail: 1, traffic: 16, dpr: [1, 2] },
-  balanced: { detail: .72, traffic: 10, dpr: [1, 1.25] },
-  low: { detail: .45, traffic: 6, dpr: [1, 1] },
+export const waterWaveBudgets: Record<QualityPreset, number> = { auto: 3, high: 3, balanced: 2, low: 1 }
+const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dpr: [number, number]; waterLayers: number }> = {
+  auto: { detail: 1, traffic: 16, dpr: [1, 1.5], waterLayers: waterWaveBudgets.auto },
+  high: { detail: 1, traffic: 16, dpr: [1, 2], waterLayers: waterWaveBudgets.high },
+  balanced: { detail: .72, traffic: 10, dpr: [1, 1.25], waterLayers: waterWaveBudgets.balanced },
+  low: { detail: .45, traffic: 6, dpr: [1, 1], waterLayers: waterWaveBudgets.low },
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
@@ -119,7 +120,31 @@ function Architecture({ theme, night, detail }: { theme: ThemeName | null; night
   return <><Boxes items={masses} /><Boxes items={trim} color="#8b9d95" /><Boxes items={glass} color="#405e67" /><Boxes items={landscape} /><Boxes items={windows} color={night ? '#f2c17e' : '#687f82'} glow night={night} /></>
 }
 
-function Megastructure({ accent, night }: { accent: string; night: boolean }) {
+function MegaPracticalHalo({ accent, time, quality }: { accent: string; time: TimeOfDay; quality: QualityPreset }) {
+  const ref = useRef<InstancedMesh>(null)
+  const uniforms = useMemo(() => ({ uColor: { value: new Color(accent) }, uOpacity: { value: time === 'night' ? .24 : .065 } }), [accent, time])
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const object = new Object3D()
+    megaPracticalPositions.forEach((position, index) => {
+      object.position.set(position[0], position[1], position[2] + .12)
+      object.updateMatrix()
+      ref.current!.setMatrixAt(index, object.matrix)
+    })
+    ref.current.instanceMatrix.needsUpdate = true
+    ref.current.computeBoundingSphere()
+  }, [])
+  if (time === 'day' || quality === 'low') return null
+  return <instancedMesh ref={ref} args={[undefined, undefined, megaPracticalPositions.length]} frustumCulled={false} raycast={() => null}>
+    <planeGeometry args={[2.4, 16.4]} />
+    <shaderMaterial uniforms={uniforms} transparent depthTest depthWrite={false} vertexShader={`varying vec2 vUv;
+      void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`}
+      fragmentShader={`varying vec2 vUv; uniform vec3 uColor; uniform float uOpacity;
+      void main(){ vec2 p=vUv-.5; float edge=1.0-smoothstep(.18,.52,length(vec2(p.x*.95,p.y*.62))); float vertical=smoothstep(.03,.18,vUv.y)*(1.0-smoothstep(.82,.97,vUv.y)); gl_FragColor=vec4(uColor,edge*vertical*uOpacity); }`} />
+  </instancedMesh>
+}
+
+function Megastructure({ accent, night, sunset, quality, time }: { accent: string; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay }) {
   const rotor = useRef<Group>(null)
   useFrame((_, delta) => { if (rotor.current) rotor.current.rotation.y += delta * .13 })
   const ribs = useMemo(() => {
@@ -150,6 +175,7 @@ function Megastructure({ accent, night }: { accent: string; night: boolean }) {
     <mesh position={[-14, 17, 9]} rotation-z={-.18} castShadow receiveShadow><boxGeometry args={[17, 3, 7]} /><meshStandardMaterial color="#607b7a" roughness={.7} /></mesh>
     <Boxes color="#b8bca9" items={[{ position: [-21, 9, 9], size: [1, 15, 1] }, { position: [-14, 18.5, 9], size: [16, .18, 6] }]} />
     {night && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28} distance={16} decay={2} />)}
+    <MegaPracticalHalo accent={accent} time={sunset ? 'sunset' : time} quality={quality} />
     <group position={[0, 27.8, 9]} ref={rotor}>
       <mesh rotation-x={Math.PI / 2} castShadow><torusGeometry args={[2.7, .17, 8, 40]} /><meshStandardMaterial color={accent} roughness={.5} metalness={.4} /></mesh>
       <Boxes color={accent} items={[{ position: [0, 0, 0], size: [5.5, .18, .18] }, { position: [0, 0, 0], size: [.18, .18, 5.5] }]} />
@@ -162,7 +188,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
   }, [time, weather, mode, quality])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -181,28 +207,58 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
     <planeGeometry args={[20000, 20000]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`varying vec3 world;
       void main(){ world=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0); }`}
-      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain; uniform float uIce;
+      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain; uniform float uIce; uniform float uWaveLayers;
       ${riverShader}
       ${heightFogGLSL}
+      float waveHeight(vec2 p, float scale, float speed, float amplitude, float time) {
+        float a=dot(p,vec2(.92,.31))*scale+time*speed;
+        float b=dot(p,vec2(-.36,.88))*scale*1.63-time*speed*.71;
+        return sin(a)*amplitude+sin(b)*amplitude*.42;
+      }
+      vec2 waveGradient(vec2 p, float fineFade, float time) {
+        vec2 g=vec2(0.0);
+        float a=dot(p,vec2(.92,.31))*.16+time*.24;
+        float b=dot(p,vec2(-.36,.88))*.26-time*.17;
+        g+=vec2(.92,.31)*cos(a)*.16*.20+vec2(-.36,.88)*cos(b)*.26*.42*.20;
+        if(uWaveLayers>1.5){
+          float c=dot(p,vec2(.74,.67))*.56+time*.61;
+          float d=dot(p,vec2(-.82,.27))*.83-time*.43;
+          g+=fineFade*(vec2(.74,.67)*cos(c)*.56*.075+vec2(-.82,.27)*cos(d)*.83*.075*.38);
+        }
+        if(uWaveLayers>2.5){
+          float e=dot(p,vec2(.37,.93))*1.72+time*1.12;
+          float f=dot(p,vec2(-.97,.18))*2.38-time*.79;
+          g+=fineFade*fineFade*(vec2(.37,.93)*cos(e)*1.72*.027+vec2(-.97,.18)*cos(f)*2.38*.027*.36);
+        }
+        return g;
+      }
       void main(){
-        float ripple=sin(world.x*.38+sin(world.z*.3)+uTime*.4)*sin(world.z*.8-uTime*.3);
-        ripple+=uRain*sin(world.x*2.1+uTime*2.8)*sin(world.z*2.7-uTime*2.3)*.35;
         float riverCenter=riverCenterAt(world.x);
         float riverWidth=riverWidthAt(world.x);
         float extent=1.0-smoothstep(250.0,261.0,abs(world.x));
         float shore=exp(-abs(abs(world.z-riverCenter)-riverWidth)*.5)*extent;
-        float broken=pow(max(0.0,sin(world.x*.8+sin(world.z*1.1)+uTime*.4)),6.0);
-        float glint=pow(max(0.0,ripple),14.0);
         float channel=(1.0-smoothstep(riverWidth-2.0,riverWidth+2.0,abs(world.z-riverCenter)))*extent;
         float freeze=channel*uIce;
-        vec3 water=uColor*(.83+.04*ripple*channel*(1.0-freeze*.92));
+        float distanceFade=1.0-smoothstep(120.0,620.0,distance(cameraPosition,world));
+        float riverPhase=world.z-riverCenter;
+        float swell=waveHeight(world.xz,.16,.24,.20,uTime);
+        float riverRipple=waveHeight(vec2(world.x,riverPhase),.62,1.05,.075,uTime*1.0);
+        riverRipple+=uRain*waveHeight(vec2(world.x*1.2,riverPhase*1.4),1.15,2.2,.035,uTime);
+        float dynamicRiver=(1.0-freeze*.98);
+        float ripple=swell*mix(1.0,dynamicRiver,channel)+riverRipple*channel*dynamicRiver;
+        vec2 gradient=waveGradient(world.xz,distanceFade,uTime);
+        gradient*=mix(1.0,dynamicRiver,channel);
+        gradient+=channel*dynamicRiver*vec2(cos(world.x*.62+uTime)*.032,sin(riverPhase*1.2-uTime*.8)*.028);
+        vec3 normal=normalize(vec3(-gradient.x,1.0,-gradient.y));
+        float broken=pow(max(0.0,sin(world.x*.8+sin(world.z*1.1)+uTime*.4)),6.0)*dynamicRiver;
+        float glint=pow(max(0.0,dot(reflect(-uSun,normal),normalize(cameraPosition-world))),18.0)*channel*dynamicRiver;
+        vec3 water=uColor*(.83+.035*ripple);
         water+=vec3(.65,.39,.14)*shore*broken*(.08+uNight*.18);
         water+=vec3(.19,.29,.34)*glint*.04*channel;
         vec3 viewDirection=normalize(cameraPosition-world);
-        vec3 normal=normalize(vec3(sin(world.x*.2+uTime*.35)*.025,1.0,cos(world.z*.27-uTime*.3)*.045));
         float spec=pow(max(0.0,dot(reflect(-uSun,normal),viewDirection)),150.0);
-        float shimmer=.4+.6*pow(max(0.0,sin(world.z*1.5+uTime*.6+sin(world.x*.9))),3.0);
-        spec*=1.0-freeze*.82;
+        float shimmer=.4+.6*pow(max(0.0,sin(world.z*1.5+uTime*.6+sin(world.x*.9))),3.0)*dynamicRiver;
+        spec*=1.0-freeze*.98;
         // Only the curved river channel becomes static ice; the surrounding 20000-unit water plane remains water.
         float iceGrain=.5+.5*sin(world.x*.23+sin(world.z*.11)*2.0)*sin(world.z*.31+world.x*.07);
         vec3 ice=mix(vec3(.30,.43,.49),vec3(.53,.64,.68),iceGrain);
@@ -340,22 +396,33 @@ function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
 function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady: (ms: number) => void; onUpdate: (metrics: RenderMetrics) => void }) {
   const { gl } = useThree()
   const ready = useRef(false)
+  const sample = useRef({ last: performance.now(), elapsed: 0, frames: 0, recoveringFromHidden: document.hidden })
   useEffect(() => {
-    let last = performance.now(), elapsed = 0, frames = 0, renderedFrame = -1
-    return addAfterEffect(() => {
+    const handleVisibility = () => {
+      sample.current = { last: performance.now(), elapsed: 0, frames: 0, recoveringFromHidden: document.hidden }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    let frameId = 0
+    const tick = () => {
+      frameId = requestAnimationFrame(tick)
       const now = performance.now()
-      if (gl.info.render.frame === renderedFrame) return
-      renderedFrame = gl.info.render.frame
-      if (!ready.current) { ready.current = true; onReady(Math.round(now - startedAt)); last = now; return }
-      const delta = now - last
-      last = now
-      if (document.hidden || delta > 250) { elapsed = 0; frames = 0; return }
-      elapsed += delta; frames++
-      if (elapsed >= 1000) {
-        onUpdate({ fps: frames * 1000 / elapsed, frameMs: elapsed / frames, calls: gl.info.render.calls, triangles: gl.info.render.triangles })
-        elapsed = 0; frames = 0
+      const current = sample.current
+      if (!ready.current) { ready.current = true; onReady(Math.round(now - startedAt)); current.last = now; return }
+      if (document.hidden) { current.recoveringFromHidden = true; current.last = now; current.elapsed = 0; current.frames = 0; return }
+      if (current.recoveringFromHidden) { current.recoveringFromHidden = false; current.last = now; return }
+      const delta = now - current.last
+      current.last = now
+      // A single stalled frame is discarded without erasing valid history; hidden-page gaps never enter a sample.
+      if (delta > 250) return
+      current.elapsed += delta; current.frames++
+      if (current.elapsed >= 1000 && current.frames >= 20) {
+        // rAF timing describes the visible browser cadence; renderer counters describe the latest main scene pass.
+        onUpdate({ fps: current.frames * 1000 / current.elapsed, frameMs: current.elapsed / current.frames, calls: gl.info.render.calls, triangles: gl.info.render.triangles, validFrames: current.frames })
+        current.elapsed = 0; current.frames = 0
       }
-    })
+    }
+    frameId = requestAnimationFrame(tick)
+    return () => { document.removeEventListener('visibilitychange', handleVisibility); cancelAnimationFrame(frameId) }
   }, [gl, onReady, onUpdate, startedAt])
   return null
 }
@@ -397,7 +464,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />
-    <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} />
+    <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} quality={quality} />
     <CameraDirector mode={mode} />
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
@@ -406,7 +473,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <MetropolitanLandscape night={night} weather={weather} />
     {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
     {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
-    <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} /><Transport night={night} count={config.traffic} />
+    <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} sunset={time === 'sunset'} time={time} quality={quality} /><Transport night={night} count={config.traffic} />
     <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <WebGLGuard onError={onError} />
