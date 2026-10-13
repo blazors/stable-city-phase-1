@@ -13,11 +13,12 @@ export const timeLighting: Record<TimeOfDay, { hemisphere: number; fill: number 
   night: { hemisphere: .62, fill: .18 },
 }
 
-export function sceneFog(time: TimeOfDay, weather: Weather, color: string) {
+export function sceneFog(time: TimeOfDay, weather: Weather, color: string, overviewDistanceOffset = 0) {
   const { fogNear, fogFar } = weatherLighting[weather]
   // Cool aerial perspective separates the distant skyline without lifting near-field lighting.
-  if (time === 'night' && weather === 'haze') return { color: '#344c60', near: fogNear, far: fogFar }
-  return { color, near: fogNear, far: fogFar }
+  const offset = Math.max(0, overviewDistanceOffset)
+  if (time === 'night' && weather === 'haze') return { color: '#344c60', near: fogNear + offset, far: fogFar + offset }
+  return { color, near: fogNear + offset, far: fogFar + offset }
 }
 // Visible strips and receiver lights share world-space positions.
 export const megaPracticalPositions: [number, number, number][] = [[-5.83, 11, 5.5], [5.83, 11, 5.5]]

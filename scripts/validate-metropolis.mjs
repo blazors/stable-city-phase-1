@@ -12,7 +12,7 @@ async function sourceModule(file) {
 }
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
-const { cameraPosition, cameraViews, createSceneCamera } = await sourceModule('../src/camera.ts')
+const { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset } = await sourceModule('../src/camera.ts')
 const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = await sourceModule('../src/lighting.ts')
 const { createMegaRoofRibs, megaRoofDeck, megaRoofFascia, megaRoofRibHeight, megaRoofRibY, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
 const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
@@ -33,6 +33,9 @@ for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(
   } else assert.deepEqual(fog, { color: '#243c54', near: baseline.fogNear, far: baseline.fogFar }, `${time}/${weather}: original fog retained`)
 }
 assert.deepEqual(sceneFog('night', 'clear', '#abcdef'), { color: '#abcdef', near: 340, far: 920 }, 'leaving night haze restores caller palette and clear distance')
+assert(overviewDistanceOffset() > 0 && overviewDistanceOffset() < 100, 'overview distance compensation matches the wider authored camera')
+assert.deepEqual(sceneFog('day', 'clear', '#abcdef', overviewDistanceOffset()), { color: '#abcdef', near: 340 + overviewDistanceOffset(), far: 920 + overviewDistanceOffset() }, 'overview fog follows the wider camera distance')
+assert.deepEqual(sceneFog('day', 'clear', '#abcdef', 0), { color: '#abcdef', near: 340, far: 920 }, 'Mega keeps the original fog distance')
 assert.deepEqual(weatherLighting.rain, { direct: .40, fill: .98, fogNear: 270, fogFar: 780 }, 'rain follows the authored visibility and lighting budget')
 assert.deepEqual(weatherLighting.snow, { direct: .48, fill: 1.02, fogNear: 245, fogFar: 820 }, 'snow preserves authored near-field visibility')
 assert(weatherLighting.clear.direct > weatherLighting.haze.direct && weatherLighting.haze.direct > weatherLighting.rain.direct, 'weather softens direct light progressively')
@@ -57,13 +60,25 @@ for (const mode of ['overview', 'mega']) {
     assert(adapted.every(Number.isFinite), `${mode}: finite adapted position`)
     const scale = (adapted[0] - target[0]) / (position[0] - target[0])
     assert(scale >= 1 && scale <= 2.7, `${mode}: bounded viewport fit`)
-    assert(Math.hypot(...adapted.map((value, axis) => value - target[axis])) < (mode === 'overview' ? 1400 : 800), `${mode}: orbit bounds retain adapted camera`)
+    const distance = Math.hypot(...adapted.map((value, axis) => value - target[axis]))
+    assert(distance < (mode === 'overview' ? 1700 : 800), `${mode}: orbit bounds retain adapted camera`)
+    assert(distance < initial.far, `${mode}: adapted camera stays inside the far plane`)
     if (mode !== 'mega' || aspect >= .9) {
       for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: landscape viewport preserves viewing direction`)
     } else {
       assert(Math.abs((adapted[0] - target[0]) / (adapted[2] - target[2])) < Math.abs((position[0] - target[0]) / (position[2] - target[2])), 'portrait Mega turns toward the central skyline valley')
     }
   }
+}
+const overviewCamera = createSceneCamera('overview')
+overviewCamera.aspect = 1.5
+overviewCamera.position.set(...cameraPosition('overview', 1.5))
+overviewCamera.lookAt(...cameraViews.overview.target)
+overviewCamera.updateProjectionMatrix()
+overviewCamera.updateMatrixWorld()
+for (const [x, z] of [[-234, -126], [234, -126], [-234, 234], [234, 234]]) {
+  const projected = new Vector3(x, 0, z).project(overviewCamera)
+  assert(Math.abs(projected.x) < 1.25 && projected.y > -1.25 && projected.y < .9, `overview keeps the occupied metropolitan grid near the safe frame`)
 }
 const foregroundTower = createStableCity().buildings.find(building => building.id === '1:0-0')
 for (const aspect of [.5, 1.5]) {
@@ -102,6 +117,23 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   assert(civicApron.every(({ size: [, height] }) => height <= 8), 'open civic apron and skyline valley stay low')
   const parkMouth = scene.parks.filter(({ position: [x], size: [w] }) => w === 3 && x > -115 && x < -45)
   assert.equal(parkMouth.filter(({ size: [, , depth] }) => depth === 22).length, parkMouth.length / 2, 'south-bank park mouth widens continuously')
+  assert(scene.buildings.length > 250 && scene.buildings.length <= Math.floor(291 * 1.25), 'controlled density stays within the 25% metropolitan budget without hollowing out the city')
+  assert.equal(scene.roofs.length, scene.buildings.length, 'every outer building receives exactly one roof')
+  assert.equal(scene.terraces.length, scene.buildings.length, 'every outer building receives exactly one terrace')
+  scene.buildings.forEach((building, index) => {
+    const [x, y, z] = building.position, [width, height, depth] = building.size
+    const roof = scene.roofs[index], terrace = scene.terraces[index]
+    assert.deepEqual([roof.position[0], roof.position[2]], [x, z], 'roof stays centered on its building')
+    assert(Math.abs(roof.position[1] - (y + height / 2 + .12)) < 1e-9, 'roof stays attached to the building top')
+    assert.deepEqual([terrace.position[0], terrace.position[2]], [x, z], 'terrace stays centered on its building')
+    assert(roof.size[0] >= width && roof.size[2] >= depth, 'roof covers its base mass')
+  })
+  const pairedBuildings = scene.buildings.filter((building, index, buildings) => buildings.slice(index + 1).some(other =>
+    !building.tower && !other.tower && Math.abs(Math.abs(building.position[0] - other.position[0]) - 6.8) < 1e-9 && Math.abs(building.position[2] - other.position[2]) <= 1
+  ))
+  assert(pairedBuildings.length > 0, 'controlled two-building parcels are generated')
+  const northEdge = x => 252 + Math.sin(x / 80) * 22 - .0005 * x * x
+  assert(scene.buildings.every(({ position: [x, , z] }) => z <= northEdge(x) - 36), 'north edge green buffer remains free of buildings')
   for (const [name, items] of Object.entries(scene)) {
     if (name === 'bridges') continue
     for (const item of items) {

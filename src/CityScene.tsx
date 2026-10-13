@@ -10,7 +10,7 @@ import { Rain, Snow } from './Precipitation'
 import { LensWeather } from './LensWeather'
 import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
-import { cameraPosition, cameraViews, createSceneCamera } from './camera'
+import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
 import { createMegaRoofRibs, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 import { HeightFog } from './HeightFog'
@@ -184,12 +184,13 @@ function Megastructure({ accent, night, sunset, quality, time }: { accent: strin
 }
 
 function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset }) {
+  const overviewOffset = mode === 'overview' ? overviewDistanceOffset() : 0
   const material = useRef<ShaderMaterial>(null)
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-    return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
-  }, [time, weather, mode, quality])
+      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+  }, [time, weather, mode, quality, overviewOffset])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => { motion.current = !preference.matches }
@@ -265,7 +266,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
         ice+=vec3(.04,.05,.055)*pow(max(0.0,sin(world.x*.67+world.z*.13)),18.0);
         water=mix(water,ice,freeze*.96);
         water+=uSunColor*spec*shimmer*uReflection;
-        gl_FragColor=vec4(applyHeightFog(mix(water,uHaze,smoothstep(420.0,950.0,distance(cameraPosition,world))),world),1.0);
+        gl_FragColor=vec4(applyHeightFog(mix(water,uHaze,smoothstep(${(420 + overviewOffset).toFixed(1)},${(950 + overviewOffset).toFixed(1)},distance(cameraPosition,world))),world),1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`} />
@@ -335,7 +336,12 @@ function RainPuddles({ night, quality, roads }: { night: boolean; quality: Quali
   </instancedMesh>
 }
 
-function MetropolitanLandscape({ night, weather }: { night: boolean; weather: Weather }) {
+function MetropolitanLandscape({ night, weather, quality }: { night: boolean; weather: Weather; quality: QualityPreset }) {
+  const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
+  const trees = quality === 'high' || quality === 'auto' ? metropolis.trees : pick(metropolis.trees, quality === 'balanced' ? .75 : .5)
+  const windows = quality === 'high' || quality === 'auto' ? metropolis.windows : pick(metropolis.windows, quality === 'balanced' ? .6 : .3)
+  const lights = quality === 'high' || quality === 'auto' ? metropolis.lights : pick(metropolis.lights, quality === 'balanced' ? .75 : .5)
+  const terraces = quality === 'low' ? metropolis.terraces.filter(item => item.tower) : metropolis.terraces
   return <>
     <Boxes items={metropolis.land} color="#778782" />
     <Boxes items={metropolis.parks} color="#526f56" />
@@ -343,10 +349,10 @@ function MetropolitanLandscape({ night, weather }: { night: boolean; weather: We
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
     <Boxes items={metropolis.buildings} />
     <Boxes items={metropolis.roofs} color="#8a9c97" />
-    <Boxes items={metropolis.terraces} />
-    <Boxes items={metropolis.trees} foliage />
-    <Boxes items={metropolis.windows} color={night ? '#eabb7a' : '#496876'} glow night={night} />
-    <Boxes items={metropolis.lights} color="#e9b779" glow night={night} />
+    <Boxes items={terraces} />
+    <Boxes items={trees} foliage />
+    <Boxes items={windows} color={night ? '#eabb7a' : '#496876'} glow night={night} />
+    <Boxes items={lights} color="#e9b779" glow night={night} />
     {metropolis.bridges.map(({ x, z, span }) => <group key={x} position={[x, 0, z]}>
       <Boxes color="#b4b6a9" items={[{ position: [0, .65, 0], size: [5, 1, span] }, ...[-1, 1].map(v => ({ position: [0, -1, v * (span / 2 - 5)] as Vec3, size: [3, 3, 1] as Vec3 }))]} />
       <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, span] }))} />
@@ -448,7 +454,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
   const p = environmentPalette(time, weather), night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
   const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
-  const fog = sceneFog(time, weather, p.haze)
+  const fog = sceneFog(time, weather, p.haze, mode === 'overview' ? overviewDistanceOffset() : 0)
   const sceneCamera = useMemo(() => createSceneCamera(mode), [mode])
   return <Canvas
     camera={sceneCamera}
@@ -470,11 +476,11 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} mode={mode} quality={quality} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
-    <MetropolitanLandscape night={night} weather={weather} />
+    <MetropolitanLandscape night={night} weather={weather} quality={quality} />
     {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
     {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} sunset={time === 'sunset'} time={time} quality={quality} /><Transport night={night} count={config.traffic} />
-    <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1400 : 800} enableDamping dampingFactor={.06} />
+    <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={weather} quality={quality} mode={mode} />

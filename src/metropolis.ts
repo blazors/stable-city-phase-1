@@ -1,4 +1,4 @@
-type Box = { position: [number, number, number]; size: [number, number, number]; color?: string }
+type Box = { position: [number, number, number]; size: [number, number, number]; color?: string; tower?: boolean }
 
 // Shared by land placement and the water shader; the river stays outside the locked core.
 export const riverCenter = (x: number) => 84 + Math.sin(x / 95) * 24 - .002 * Math.max(-x, 0) ** 2
@@ -37,11 +37,14 @@ export function generateMetropolis(seed: number) {
     if ([-9, 0, 9].some(dx => Math.abs(z - riverCenter(x + dx)) < riverHalfWidth(x + dx) + 22)) continue
     const parkAxis = -77 + Math.sin(z / 65) * 14
     const park = Math.abs(x - parkAxis) < 25 && z > -100 && z < 72
-    const edgeGarden = Math.abs(x) > 215 || z < southEdge(x) + 33
+    // Reserve a little extra before applying the seeded building offset so the
+    // visible northern skyline still lands behind a continuous green buffer.
+    const edgeGarden = Math.abs(x) > 215 || z < southEdge(x) + 33 || z > northEdge(x) - 40
     if (park || edgeGarden) {
       parks.push({ position: [x, -.08, z], size: [17.9, .18, 17.9] })
       if (park) paths.push({ position: [x, .12, z], size: [2, .13, 18] })
-      for (let i = 0; i < (park ? 5 : 3); i++) trees.push({ position: [x + (random() - .5) * 13, 2, z + (random() - .5) * 13], size: [3, 4, 3], color: '#5b8065' })
+      const deepPark = park && z >= -54 && z <= 18 && Math.abs(x - parkAxis) <= 14
+      for (let i = 0; i < (park ? (deepPark ? 2 : 5) : 3); i++) trees.push({ position: [x + (random() - .5) * 13, 2, z + (random() - .5) * 13], size: [3, 4, 3], color: '#5b8065' })
       continue
     }
     roads.push({ position: [x - 8, -.01, z], size: [2, .12, 18] })
@@ -62,21 +65,18 @@ export function generateMetropolis(seed: number) {
     const width = tower ? 5 + random() * 2 : variant === 0 ? 12 : variant === 1 ? 5 : 8 + random() * 3
     const depth = tower ? 6 + random() * 2 : variant === 1 ? 12 : variant === 0 ? 5 : 7 + random() * 3
     const px = x + random() * 2, pz = z + random() * 2
-    buildings.push({ position: [px, height / 2, pz], size: [width, height, depth], color: gardenQuarter ? (random() > .5 ? '#b7b39b' : '#82958a') : (random() > .7 ? '#a5b2ac' : '#5d7c83') })
-    roofs.push({ position: [px, height + .12, pz], size: [width + .15, .24, depth + .15] })
-    if (tower) {
-      terraces.push({ position: [px, height + 1.7, pz], size: [width * .66, 3, depth * .65], color: '#8eaaa7' })
-    } else if (gardenQuarter) {
-      terraces.push({ position: [px, height + .36, pz], size: [width * .8, .2, depth * .8], color: '#63816b' })
-    } else {
-      terraces.push({ position: [px, height + .7, pz], size: [width * .35, .9, depth * .45], color: '#84928c' })
+    const color = gardenQuarter ? (random() > .5 ? '#b7b39b' : '#82958a') : (random() > .7 ? '#a5b2ac' : '#5d7c83')
+    const addBuilding = (bx: number, bz: number, bw: number, bd: number, bh: number) => {
+      buildings.push({ position: [bx, bh / 2, bz], size: [bw, bh, bd], color, tower })
+      roofs.push({ position: [bx, bh + .12, bz], size: [bw + .15, .24, bd + .15], tower })
+      terraces.push({ position: [bx, bh + (tower ? 1.7 : gardenQuarter ? .36 : .7), bz], size: [tower ? bw * .66 : gardenQuarter ? bw * .8 : bw * .35, tower ? 3 : gardenQuarter ? .2 : .9, tower ? bd * .65 : gardenQuarter ? bd * .8 : bd * .45], color: tower ? '#8eaaa7' : gardenQuarter ? '#63816b' : '#84928c', tower })
+      for (let y = 2; y < bh; y += 3.5) if ((Math.floor(y) + variant) % 3 !== 0) { windows.push({ position: [bx + (variant - 1.5) * bw * .1, y, bz - bd / 2 - .03], size: [bw * .38, .3, .06] }); windows.push({ position: [bx - bw / 2 - .03, y, bz], size: [.06, .3, bd * .4] }) }
     }
-    for (let y = 2; y < height; y += 3.5) {
-      // Interrupted lit floors prevent every facade becoming an equally bright stripe.
-      if ((Math.floor(y) + variant) % 3 === 0) continue
-      windows.push({ position: [px + (variant - 1.5) * width * .1, y, pz - depth / 2 - .03], size: [width * .38, .3, .06] })
-      windows.push({ position: [px - width / 2 - .03, y, pz], size: [.06, .3, depth * .4] })
-    }
+    if (!gardenQuarter && cluster < .34 && variant === 2) {
+      const gap = 3.4, delta = 1.5 + random() * 1.5, secondHeight = Math.max(2, height - delta)
+      addBuilding(px - gap, pz + (random() - .5), 4.5 + random() * .5, 7 + random() * 3, height)
+      addBuilding(px + gap, pz + (random() - .5), 4.5 + random() * .5, 7 + random() * 3, secondHeight)
+    } else addBuilding(px, pz, width, depth, height)
   }
   const bridges = [-174, -66, 66, 174].map(x => ({ x, z: riverCenter(x), span: riverHalfWidth(x) * 2 + 12 }))
   for (const { x, z, span } of bridges) for (const side of [-1, 1]) {
