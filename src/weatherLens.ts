@@ -27,3 +27,14 @@ export function lensEdgeMask(u: number, v: number) {
 export function lensStrength(time: TimeOfDay, mode: 'overview' | 'mega') {
   return (time === 'night' ? .65 : 1) * (mode === 'mega' ? .8 : 1)
 }
+
+export type RainCandidate = { row: number; seed: number; x: number; size: number; present: boolean }
+// Continuous row coordinates keep the same droplet identity while crossing a cell boundary.
+export function rainCandidates(u: number, v: number, time: number, columns: number, rows: number, seed = 0): RainCandidate[] {
+  const column = Math.floor(u * columns), continuousRow = v * rows + time * (.13 + hashRain(column + 2.7 + seed) * .09), row = Math.floor(continuousRow)
+  return [-1, 0, 1].map(offset => {
+    const id = row + offset, stable = hashRain(column * 127.1 + id * 311.7 + seed)
+    return { row: id, seed: stable, x: column + .2 + hashRain(column * 17.3 + id * 7.1 + seed) * .6, size: .13 + stable * .1, present: stable >= .64 }
+  })
+}
+function hashRain(value: number) { return ((Math.sin(value) * 43758.5453) % 1 + 1) % 1 }

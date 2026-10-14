@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector2, Vector3, type ShaderMaterial, Scene as ThreeScene, WebGLRenderer } from 'three'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
@@ -33,29 +33,34 @@ const fragmentShader = `
     if(edge<=0.0) discard;
     vec3 color=vec3(.77,.86,.91);
     float alpha=0.0;
-    float trail=0.0, present=0.0, shine=0.0, rainBody=0.0, rainRim=0.0;
-    vec2 rainNormal=vec2(0.0);
     if(uWeather.x>0.0) {
       // Each fixed column has its own phase and speed; no CPU drop updates.
-      vec2 cell=vec2(floor(uv.x*uGrid.x),0.0);
-      float speed=.07+hash(cell+4.3)*.055;
+      float column=floor(uv.x*uGrid.x);
+      vec2 seedCell=vec2(column,2.7);
+      float speed=.13+hash(seedCell)*.09;
       vec2 grid=vec2(uv.x*uGrid.x,uv.y*uGrid.y+uTime*speed);
-      cell=floor(grid);
-      vec2 local=fract(grid)-vec2(.24+hash(cell+3.7)*.52,.5);
-      // Correct the actual cell aspect, including narrow browser viewports.
-      local.x*=uAspect*uGrid.y/uGrid.x;
-      float size=.13+hash(cell+8.1)*.10;
-      vec2 drop=local/vec2(size,size*1.55);
-      float radius=length(drop);
-      rainBody=1.0-smoothstep(.72,1.0,radius);
-      rainRim=smoothstep(.52,.76,radius)*(1.0-smoothstep(.78,1.06,radius));
-      rainNormal=normalize(drop+vec2(.0001));
-      shine=(1.0-smoothstep(.12,.42,length(drop-vec2(-.30,.35))))*rainBody;
-      trail=(1.0-smoothstep(size*.10,size*.33,abs(local.x)))
-        *smoothstep(size, size*1.9,local.y)*(1.0-smoothstep(size*2.0,size*5.5,local.y));
-      present=step(.64,hash(cell+19.2));
-      alpha=(rainRim*.62+rainBody*.10+shine*.72+trail*.22)*present*uWeather.x;
-      color=mix(vec3(.16,.25,.31),vec3(.88,.95,1.0),clamp(shine+trail*.4,0.0,1.0));
+      float row=floor(grid.y);
+      float bestAlpha=0.0;
+      vec3 bestColor=color;
+      for(int candidate=-1; candidate<=1; candidate++) {
+        vec2 cell=vec2(column,row+float(candidate));
+        vec2 local=vec2(grid.x-column,grid.y-(row+float(candidate)))-vec2(.20+hash(cell+3.7)*.60,.48);
+        // Correct the actual cell aspect, including narrow browser viewports.
+        local.x*=uAspect*uGrid.y/uGrid.x;
+        float size=.13+hash(cell+8.1)*.10;
+        vec2 drop=local/vec2(size,size*1.55);
+        float radius=length(drop);
+        float body=1.0-smoothstep(.72,1.0,radius);
+        float rim=smoothstep(.52,.76,radius)*(1.0-smoothstep(.78,1.06,radius));
+        float candidateShine=(1.0-smoothstep(.12,.42,length(drop-vec2(-.30,.35))))*body;
+        float candidateTrail=(1.0-smoothstep(size*.10,size*.33,abs(local.x)))
+          *smoothstep(size, size*1.9,local.y)*(1.0-smoothstep(size*2.0,size*4.8,local.y));
+        float candidatePresent=step(.64,hash(cell+19.2));
+        float candidateAlpha=(rim*.62+body*.10+candidateShine*.72+candidateTrail*.22)*candidatePresent*uWeather.x;
+        if(candidateAlpha>bestAlpha){bestAlpha=candidateAlpha;bestColor=mix(vec3(.16,.25,.31),vec3(.88,.95,1.0),clamp(candidateShine+candidateTrail*.4,0.0,1.0));}
+      }
+      alpha=bestAlpha;
+      color=bestColor;
     }
     if(uWeather.y>0.0) {
       vec2 p=uv*vec2(uAspect,1.0);
@@ -102,16 +107,20 @@ const postFragmentShader = `
     if(edge<=0.0){gl_FragColor=sceneColor;return;}
     vec3 result=sceneColor.rgb;
     if(uWeather.x>0.0){
-      vec2 grid=vec2(uv.x*uGrid.x,uv.y*uGrid.y+uTime*(.13+hash(vec2(floor(uv.x*uGrid.x),2.7))*.09));
-      vec2 cell=floor(grid),local=fract(grid)-vec2(.20+hash(cell+3.7)*.60,.48);local.x*=uAspect*uGrid.y/uGrid.x;
-      float size=.13+hash(cell+8.1)*.10;vec2 drop=local/vec2(size,size*1.55);float radius=length(drop);
-      float body=1.0-smoothstep(.68,1.0,radius);float rim=smoothstep(.50,.76,radius)*(1.0-smoothstep(.78,1.08,radius));
-      float shine=(1.0-smoothstep(.10,.40,length(drop-vec2(-.30,.35))))*body;
-      float trail=(1.0-smoothstep(size*.10,size*.30,abs(local.x)))*smoothstep(size,size*1.8,local.y)*(1.0-smoothstep(size*1.9,size*4.8,local.y));
-      float present=step(.64,hash(cell+19.2));float lens=clamp((body+rim+shine+trail)*present*edge*uStrength,0.0,1.0);
-      vec2 normal=normalize(drop+vec2(.0001));vec2 refractUv=clamp(uv+(normal*body*.0045+vec2(-.0015,.004)*trail)*present*uWeather.x,vec2(0.0),vec2(1.0));
-      vec3 refracted=texture2D(tDiffuse,refractUv).rgb;result=mix(sceneColor.rgb,refracted,lens*.82);result*=1.0-body*present*edge*.08;
-      result+=vec3(.82,.91,.96)*(rim*.18+shine*.30+trail*.07)*present*edge*uWeather.x;
+      float column=floor(uv.x*uGrid.x); vec2 seedCell=vec2(column,2.7); float speed=.13+hash(seedCell)*.09; vec2 grid=vec2(uv.x*uGrid.x,uv.y*uGrid.y+uTime*speed); float row=floor(grid.y);
+      float bestLens=0.0,bestBody=0.0,bestRim=0.0,bestShine=0.0,bestTrail=0.0,bestPresent=0.0;vec2 bestNormal=vec2(0.0);
+      for(int candidate=-1; candidate<=1; candidate++) {
+        vec2 cell=vec2(column,row+float(candidate)); vec2 local=vec2(grid.x-column,grid.y-(row+float(candidate)))-vec2(.20+hash(cell+3.7)*.60,.48);local.x*=uAspect*uGrid.y/uGrid.x;
+        float size=.13+hash(cell+8.1)*.10;vec2 drop=local/vec2(size,size*1.55);float radius=length(drop);
+        float body=1.0-smoothstep(.68,1.0,radius);float rim=smoothstep(.50,.76,radius)*(1.0-smoothstep(.78,1.08,radius));
+        float shine=(1.0-smoothstep(.10,.40,length(drop-vec2(-.30,.35))))*body;
+        float trail=(1.0-smoothstep(size*.10,size*.30,abs(local.x)))*smoothstep(size,size*1.8,local.y)*(1.0-smoothstep(size*1.9,size*4.8,local.y));
+        float present=step(.64,hash(cell+19.2));float lens=clamp((body+rim+shine+trail)*present*edge*uStrength,0.0,1.0);
+        if(lens>bestLens){bestLens=lens;bestBody=body;bestRim=rim;bestShine=shine;bestTrail=trail;bestPresent=present;bestNormal=normalize(drop+vec2(.0001));}
+      }
+      vec2 refractUv=clamp(uv+(bestNormal*bestBody*.0045+vec2(-.0015,.004)*bestTrail)*bestPresent*uWeather.x,vec2(0.0),vec2(1.0));
+      vec3 refracted=texture2D(tDiffuse,refractUv).rgb;result=mix(sceneColor.rgb,refracted,bestLens*.82);result*=1.0-bestBody*bestPresent*edge*.08;
+      result+=vec3(.82,.91,.96)*(bestRim*.18+bestShine*.30+bestTrail*.07)*bestPresent*edge*uWeather.x;
     }
     if(uWeather.y>0.0){
       vec2 p=uv*vec2(uAspect,1.0);float macro=noise(p*5.0+vec2(2.3,8.7));float middle=noise(p*38.0+vec2(3.1,7.8));float fine=uDetail>2.5?noise(p*132.0+9.1):noise(p*72.0+9.1);
@@ -132,9 +141,9 @@ const lensShader = { uniforms: {
   uGrid: { value: new Vector2() }, uSafe: { value: new Vector2(...lensSafeHalfSize) }, uSun: { value: new Vector2() }, uWeather: { value: [0, 0, 0, 0] },
 }, vertexShader, fragmentShader: postFragmentShader }
 
-function PostProcessLens({ time, weather, quality, mode }: { time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega' }) {
-  const { gl, scene, camera, size } = useThree()
-  const composer = useRef<EffectComposer | null>(null), pass = useRef<ShaderPass | null>(null), elapsed = useRef(0), motion = useRef(true)
+function PostProcessLens({ time, weather, quality, mode, elapsed }: { time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'; elapsed: MutableRefObject<number> }) {
+  const { gl, scene, camera, size, viewport } = useThree()
+  const composer = useRef<EffectComposer | null>(null), pass = useRef<ShaderPass | null>(null), motion = useRef(true)
   const sun = useMemo(() => new Vector3(), [])
   const direction = useMemo(() => sunDirection(time), [time])
   const budget = lensBudgets[quality], profile = lensWeatherProfiles[weather]
@@ -149,21 +158,43 @@ function PostProcessLens({ time, weather, quality, mode }: { time: TimeOfDay; we
     next.setPixelRatio(renderer.getPixelRatio())
     next.addPass(new RenderPass(scene as ThreeScene, camera))
     const shaderPass = new ShaderPass(lensShader)
+    const outputPass = new OutputPass()
     shaderPass.uniforms.uDetail.value = budget.detail
     shaderPass.uniforms.uGrid.value.set(budget.columns, budget.rows)
     shaderPass.uniforms.uStrength.value = lensStrength(time, mode)
     shaderPass.uniforms.uWeather.value = [profile.rain, profile.frost, profile.dew, profile.glow]
-    const outputPass = new OutputPass()
     next.addPass(shaderPass); next.addPass(outputPass)
     composer.current = next; pass.current = shaderPass
-    next.setSize(size.width, size.height)
     return () => { shaderPass.dispose(); outputPass.dispose(); next.dispose(); renderer.info.autoReset = previousAutoReset; composer.current = null; pass.current = null }
-  }, [gl, scene, camera, size.width, size.height, budget.detail, budget.columns, budget.rows, time, mode, profile.rain, profile.frost, profile.dew, profile.glow])
+  }, [gl, scene, camera])
+  useEffect(() => {
+    const current = pass.current, next = composer.current
+    if (!current || !next) return
+    current.uniforms.uDetail.value = budget.detail
+    current.uniforms.uGrid.value.set(budget.columns, budget.rows)
+    current.uniforms.uStrength.value = lensStrength(time, mode)
+    current.uniforms.uWeather.value = [profile.rain, profile.frost, profile.dew, profile.glow]
+  }, [budget.detail, budget.columns, budget.rows, time, mode, profile.rain, profile.frost, profile.dew, profile.glow])
+  useEffect(() => {
+    const next = composer.current
+    if (!next) return
+    const samples = quality === 'high' ? 4 : 2
+    if (next.renderTarget1.samples !== samples || next.renderTarget2.samples !== samples) {
+      next.renderTarget1.dispose(); next.renderTarget2.dispose()
+      next.renderTarget1.samples = samples; next.renderTarget2.samples = samples
+    }
+    next.setSize(size.width, size.height)
+  }, [quality, size.width, size.height])
+  useEffect(() => {
+    const next = composer.current
+    if (!next) return
+    next.setPixelRatio(gl.getPixelRatio()); next.setSize(size.width, size.height)
+  }, [gl, size.width, size.height, viewport.dpr])
   useEffect(() => { const preference = window.matchMedia('(prefers-reduced-motion: reduce)'); const update = () => { motion.current = !preference.matches }; update(); preference.addEventListener('change', update); return () => preference.removeEventListener('change', update) }, [])
   useFrame(({ camera: activeCamera }, delta) => {
     if (motion.current) elapsed.current += Math.min(delta, .05)
     const current = pass.current, next = composer.current
-    if (!current || !next) return
+    if (!current || !next) { gl.render(scene, activeCamera); return }
     const values = current.uniforms
     values.uTime.value = elapsed.current; values.uAspect.value = size.width / size.height
     sun.copy(activeCamera.position).addScaledVector(direction, 1000).applyMatrix4(activeCamera.matrixWorldInverse)
@@ -173,10 +204,10 @@ function PostProcessLens({ time, weather, quality, mode }: { time: TimeOfDay; we
   return null
 }
 
-function OverlayLensWeather({ time, weather, quality, mode }: {
-  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'
+function OverlayLensWeather({ time, weather, quality, mode, elapsed }: {
+  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'; elapsed: MutableRefObject<number>
 }) {
-  const material = useRef<ShaderMaterial>(null), motion = useRef(true), elapsed = useRef(0)
+  const material = useRef<ShaderMaterial>(null), motion = useRef(true)
   const sun = useMemo(() => new Vector3(), [])
   const uniforms = useMemo(() => {
     const budget = lensBudgets[quality], profile = lensWeatherProfiles[weather]
@@ -215,7 +246,8 @@ function OverlayLensWeather({ time, weather, quality, mode }: {
 export function LensWeather({ time, weather, quality, mode }: {
   time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'
 }) {
+  const elapsed = useRef(0)
   return quality !== 'low' && (weather === 'rain' || weather === 'snow')
-    ? <PostProcessLens time={time} weather={weather} quality={quality} mode={mode} />
-    : <OverlayLensWeather time={time} weather={weather} quality={quality} mode={mode} />
+    ? <PostProcessLens time={time} weather={weather} quality={quality} mode={mode} elapsed={elapsed} />
+    : <OverlayLensWeather time={time} weather={weather} quality={quality} mode={mode} elapsed={elapsed} />
 }

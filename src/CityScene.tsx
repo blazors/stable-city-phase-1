@@ -422,7 +422,8 @@ function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady:
       if (delta > 250) return
       current.elapsed += delta; current.frames++
       if (current.elapsed >= 1000 && current.frames >= 20) {
-        // rAF timing describes the visible browser cadence; renderer counters describe the latest main scene pass.
+        // rAF timing describes visible browser cadence; renderer counters describe the latest complete frame,
+        // including shadow work and weather post-processing.
         onUpdate({ fps: current.frames * 1000 / current.elapsed, frameMs: current.elapsed / current.frames, calls: gl.info.render.calls, triangles: gl.info.render.triangles, validFrames: current.frames })
         current.elapsed = 0; current.frames = 0
       }
