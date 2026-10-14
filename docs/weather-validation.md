@@ -8,7 +8,7 @@
 
 巨构两根既有 practical 灯带共享一个实例化世界空间柔边光晕批次（最多 +1 draw、4 个三角形），白昼关闭，日落很弱，夜间受控；LOW 关闭。光晕开启深度测试、关闭深度写入，位于灯带局部空间，不是全屏 Bloom，不穿过前方遮挡物，也不替代 Hero 受光。
 
-Metrics 采样仍只在可见页发布约 1 秒窗口；隐藏页会重置窗口，偶发超过 250ms 的活动帧只丢弃该帧，不清空已有有效样本。指标增加 `validFrames` 诊断字段，`calls`/`triangles` 通过扣除 shadow-map 渲染统计，仅表示主场景 draw 与三角形，不把 rAF 均值称作 GPU 时间。新增效果均继续尊重 `prefers-reduced-motion`；LOW 保留静态水、云、天气身份。
+Metrics 当前口径以本文末尾 Stage 6 为准：只在可见页采集约 1 秒 Canvas 帧窗口，可见慢帧会纳入帧节奏，隐藏与恢复会作废旧窗口并跳过恢复首帧。`calls`/`triangles` 是 renderer 最近完整帧计数器，不是 GPU 时间，也不是采样窗口均值。新增效果均继续尊重 `prefers-reduced-motion`；LOW 保留静态水、云、天气身份。
 
 ## 暴雨强化与冰封暴雪 Stage 2
 
@@ -123,3 +123,21 @@ HIGH/AUTO 使用两项低频密度打散，BALANCED 一项，LOW 不打散但保
 - 原有大 JS chunk 警告仍在；本次构建 JS 约 1,201 kB，gzip 约 341 kB。
 - 本轮无新增依赖、文件删除、部署或城市核心生成规则变更。未提交或推送本轮改动。
 - 编辑前备份保存在 `tmp/weather-backup-20260921-195446/`，不应提交至 Git。
+
+## Stage 6 · 可信性能采样与组合矩阵
+
+性能采样已改为跟随 React Three Fiber 的实际 Canvas 帧。配置切换会立即作废当前指标并建立新 revision；页面隐藏时暂停并重置采样窗口。每条 READY 样本至少包含 30 个有效帧和 1000 ms 可见采样时间。`frameMs` 表示可见 Canvas 帧节奏，Draw Calls / Triangles 是最近完整渲染帧的 renderer counters，不是 GPU timestamp。
+
+2026-10-14 在 Codex 内置浏览器、1280 × 720、DPR 1、Vite 开发服务下完成：
+
+- Overview 完整矩阵：4 天气 × 3 时段 × 4 质量，共 48 格；每格得到新 revision，59–62 个有效帧、1000–1017 ms 采样窗口，无 fallback、console、Shader 或 WebGL 错误。
+- Mega 风险矩阵：雨 / 雪 × 3 时段 × HIGH / LOW，共 12 格；每格得到新 revision，61 个有效帧、1000–1013 ms 采样窗口，无 fallback、console、Shader 或 WebGL 错误。
+- 本机观测为 59–61 FPS、16.3–17.0 ms。该结果只描述本次可见浏览器环境，不代表 GPU 时间或其他设备性能。
+- Overview 夜雨 HIGH：61 FPS、16.4 ms、87 draws、208,324 tris；LOW：61 FPS、16.4 ms、55 draws、75,180 tris。
+- Overview 夜雪 HIGH：61 FPS、16.5 ms、87 draws、207,122 tris；LOW：61 FPS、16.5 ms、55 draws、77,818 tris。
+- Mega 夜雨 HIGH：61 FPS、16.4 ms、77 draws、206,212 tris；LOW：61 FPS、16.5 ms、45 draws、73,068 tris。
+- Mega 夜雪 HIGH：61 FPS、16.5 ms、77 draws、205,010 tris；LOW：61 FPS、16.4 ms、45 draws、75,706 tris。
+
+LOW 的 draw calls 与 triangles 在所有抽查组合中均低于 HIGH。现有 Vite 大 chunk 提示仍在，本轮不将其误报为运行失败。
+
+证据边界：本次 60 格浏览器遍历的逐格原始 JSON 未在首次运行时落盘，因此上面的完整矩阵与无错误结论是当次人工验收记录，不是可自动重放的回归工件；仓库中可复核的是四组代表性 HIGH/LOW 数值、源码契约与构建/数值测试。后续矩阵验收必须先导出逐格结果再宣告自动化通过。

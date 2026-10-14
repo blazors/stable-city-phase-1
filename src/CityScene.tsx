@@ -33,7 +33,8 @@ const snowSurfaces = [
 export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string }
-export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number }
+export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number; sampleDurationMs: number; configRevision: number }
+type CanvasMetrics = Omit<RenderMetrics, 'configRevision'>
 export type QualityPreset = 'auto' | 'high' | 'balanced' | 'low'
 export const waterWaveBudgets: Record<QualityPreset, number> = { auto: 3, high: 3, balanced: 2, low: 1 }
 const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dpr: [number, number]; waterLayers: number }> = {
@@ -399,38 +400,33 @@ function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
   return null
 }
 
-function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady: (ms: number) => void; onUpdate: (metrics: RenderMetrics) => void }) {
+function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady: (ms: number) => void; onUpdate: (metrics: CanvasMetrics) => void }) {
   const { gl } = useThree()
   const ready = useRef(false)
-  const sample = useRef({ last: performance.now(), elapsed: 0, frames: 0, recoveringFromHidden: document.hidden })
+  const sample = useRef({ elapsed: 0, frames: 0, recoveringFromHidden: document.hidden })
   useEffect(() => {
     const handleVisibility = () => {
-      sample.current = { last: performance.now(), elapsed: 0, frames: 0, recoveringFromHidden: document.hidden }
+      sample.current = { elapsed: 0, frames: 0, recoveringFromHidden: true }
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    let frameId = 0
-    const tick = () => {
-      frameId = requestAnimationFrame(tick)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+  useEffect(() => { sample.current = { elapsed: 0, frames: 0, recoveringFromHidden: true } }, [onUpdate])
+  useFrame((_state, deltaSeconds) => {
       const now = performance.now()
       const current = sample.current
-      if (!ready.current) { ready.current = true; onReady(Math.round(now - startedAt)); current.last = now; return }
-      if (document.hidden) { current.recoveringFromHidden = true; current.last = now; current.elapsed = 0; current.frames = 0; return }
-      if (current.recoveringFromHidden) { current.recoveringFromHidden = false; current.last = now; return }
-      const delta = now - current.last
-      current.last = now
-      // A single stalled frame is discarded without erasing valid history; hidden-page gaps never enter a sample.
-      if (delta > 250) return
+      if (!ready.current) { ready.current = true; onReady(Math.round(now - startedAt)); return }
+      if (document.hidden) { current.recoveringFromHidden = true; current.elapsed = 0; current.frames = 0; return }
+      if (current.recoveringFromHidden) { current.recoveringFromHidden = false; return }
+      const delta = deltaSeconds * 1000
+      // Visible stalls belong to the user-perceived cadence; hidden-page gaps are reset above.
       current.elapsed += delta; current.frames++
-      if (current.elapsed >= 1000 && current.frames >= 20) {
-        // rAF timing describes visible browser cadence; renderer counters describe the latest complete frame,
-        // including shadow work and weather post-processing.
-        onUpdate({ fps: current.frames * 1000 / current.elapsed, frameMs: current.elapsed / current.frames, calls: gl.info.render.calls, triangles: gl.info.render.triangles, validFrames: current.frames })
+      if (current.elapsed >= 1000 && current.frames >= 30) {
+        // frameMs is visible Canvas cadence; counters are the latest complete render frame, not GPU time.
+        onUpdate({ fps: current.frames * 1000 / current.elapsed, frameMs: current.elapsed / current.frames, calls: gl.info.render.calls, triangles: gl.info.render.triangles, validFrames: current.frames, sampleDurationMs: current.elapsed })
         current.elapsed = 0; current.frames = 0
       }
-    }
-    frameId = requestAnimationFrame(tick)
-    return () => { document.removeEventListener('visibilitychange', handleVisibility); cancelAnimationFrame(frameId) }
-  }, [gl, onReady, onUpdate, startedAt])
+  })
   return null
 }
 
@@ -449,7 +445,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
-  onUpdate: (metrics: RenderMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
+  onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
   const startedAt = useRef(performance.now())
   const p = environmentPalette(time, weather), night = time === 'night', config = qualityConfig[quality]

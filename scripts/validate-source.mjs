@@ -11,6 +11,7 @@ const checks = [
   ['Transport contract', /mainSpine !== 'east-west' .*elevatedRail .*stationCount !== 1/s, 'src/city.ts'],
   ['Theme visual fields', /primaryHue: string.*warmCoolRelation: string.*saturationProfile: string.*valueProfile: string.*contrastMode: string.*emissionHue: string.*atmosphereTint: string/s, 'src/theme.ts'],
   ['Local routing boundary', /strategy: 'local-template'.*provider: 'none'/s, 'src/router.ts'],
+  ['Scene errors clear the current performance sample', /useEffect\(\(\) => \{ if \(sceneError\) setMetrics\(null\) \}, \[sceneError\]\)/, 'src/App.tsx'],
   ['Run report version', /RUN_REPORT_VERSION = 'local-run-report\.v1'/, 'src/runReport.ts'],
   ['Run report schema guard', /runContext.*city.*runtime.*providers/s, 'src/runReport.ts'],
   ['Camera and orbit share the focal point', /camera\.lookAt\(\.\.\.cameraViews\[mode\]\.target\).*<OrbitControls[^>]*target=\{cameraViews\[mode\]\.target\}/s, 'src/CityScene.tsx'],
