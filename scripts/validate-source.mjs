@@ -17,6 +17,7 @@ const checks = [
   ['Camera and orbit share the focal point', /camera\.lookAt\(\.\.\.cameraViews\[mode\]\.target\).*<OrbitControls[^>]*target=\{cameraViews\[mode\]\.target\}/s, 'src/CityScene.tsx'],
   ['Camera mode clears previous orbit damping', /<OrbitControls key=\{mode\}/, 'src/CityScene.tsx'],
   ['Default comparison camera is fixed', /cameraLocked = true.*<OrbitControls[^>]*enabled=\{!cameraLocked\}.*!cameraLocked && mode === 'overview' && <CameraShake/s, 'src/CityScene.tsx'],
+  ['Overview caption describes the fixed comparison camera', /固定机位 · 环境对照/, 'src/App.tsx'],
   ['Canvas owns the preframed camera from its first mount', /sceneCamera = useMemo\(\(\) => createSceneCamera\(mode\), \[mode\]\).*<Canvas\s+camera=\{sceneCamera\}/s, 'src/CityScene.tsx'],
   ['First canvas frame fits the actual viewport', /onCreated=\{\(\{ camera, size \}\) => \{\s+camera\.position\.set\(\.\.\.cameraPosition\(mode, size\.width \/ size\.height\)\)/, 'src/CityScene.tsx'],
   ['Scene has no delayed default camera replacement', /^(?![\s\S]*<PerspectiveCamera\b)/, 'src/CityScene.tsx'],
