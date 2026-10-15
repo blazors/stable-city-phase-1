@@ -6,7 +6,7 @@ import { createRainAttributes, createRainRibbonAttributes } from './rain'
 export function Rain({ count, night }: { count: number; night: boolean }) {
   const attributes = useMemo(() => createRainRibbonAttributes(count), [count])
   const material = useRef<ShaderMaterial>(null), elapsed = useRef(0), motion = useRef(true)
-  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uOpacity: { value: night ? .75 : 1 }, uResolution: { value: new Vector2(1, 1) } }), [night])
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uOpacity: { value: night ? .92 : 1 }, uResolution: { value: new Vector2(1, 1) } }), [night])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => { motion.current = !preference.matches }
@@ -43,12 +43,12 @@ export function Rain({ count, night }: { count: number; night: boolean }) {
           p+=direction*aTip*length;
           // Layers control length, speed and width while camera distance keeps the city readable.
           float cameraDistance=distance(cameraPosition,p);
-          vAlpha=(.14+aLayer*.04)*(1.0-smoothstep(260.0,760.0,cameraDistance))*smoothstep(1.5,10.0,cameraDistance);
+          vAlpha=(.19+aLayer*.05)*(1.0-smoothstep(260.0,760.0,cameraDistance))*smoothstep(1.5,10.0,cameraDistance);
           gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
           vec2 screenDirection=normalize((projectionMatrix*viewMatrix*vec4(direction,0.0)).xy);
           vec2 across=vec2(-screenDirection.y,screenDirection.x);
           // Pixel width survives driver line-width limits and follows framebuffer DPR.
-          gl_Position.xy+=across*aSide*(1.25+aLayer*1.1)*2.0/uResolution*gl_Position.w;
+          gl_Position.xy+=across*aSide*(1.45+aLayer*1.15)*2.0/uResolution*gl_Position.w;
           vTip=aTip; vSide=aSide;
         }`}
       fragmentShader={`varying float vAlpha, vTip, vSide; uniform float uOpacity; void main(){

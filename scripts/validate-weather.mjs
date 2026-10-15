@@ -43,11 +43,13 @@ assert.match(precipitation, /<mesh frustumCulled=\{false\} raycast=\{\(\) => nul
 assert.match(precipitation, /transparent depthTest depthWrite=\{false\}/, 'precipitation is occluded by opaque architecture')
 assert.match(precipitation, /attach="index"/, 'rain uses indexed ribbons instead of line-width')
 assert.match(precipitation, /prefers-reduced-motion: reduce/, 'rain respects reduced motion')
-assert.match(precipitation, /night \? \.75 : 1/, 'night rain reduces opacity')
+assert.match(precipitation, /night \? \.92 : 1/, 'night rain remains visible without increasing particle count')
+assert.match(precipitation, /vAlpha=\(\.19\+aLayer\*\.05\)/, 'rain ribbons retain the stronger authored alpha range')
+assert.match(precipitation, /1\.45\+aLayer\*1\.15/, 'rain ribbons retain the stronger authored pixel width')
 assert.match(precipitation, /distance\(cameraPosition,p\)/, 'world-space rain fades with actual camera distance')
 assert.match(precipitation, /24\.0\+aLayer\*4\.6/, 'near streaks fall faster than far streaks')
 assert.match(precipitation, /1\.1\+aLayer\*1\.4/, 'near streaks are longer than far streaks')
-assert.match(precipitation, /\.14\+aLayer\*\.04/, 'far streaks remain fainter')
+assert.match(precipitation, /\.19\+aLayer\*\.05/, 'far streaks remain fainter while the near layer gains visibility')
 assert.match(precipitation, /uResolution/, 'rain width follows the framebuffer scale')
 const snowSource = fs.readFileSync(new URL('../src/snow.ts', import.meta.url), 'utf8')
 const snowOutput = ts.transpileModule(snowSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
@@ -142,6 +144,8 @@ for (const profile of Object.values(lensWeatherProfiles)) for (const value of Ob
 }
 assert(lensWeatherProfiles.rain.rain > 0 && lensWeatherProfiles.rain.frost === 0)
 assert(lensWeatherProfiles.snow.frost > 0 && lensWeatherProfiles.snow.rain === 0)
+assert(lensWeatherProfiles.snow.frost >= .3 && lensWeatherProfiles.snow.frost <= .4, 'snow frost stays visible without rebuilding an opaque frame')
+assert(lensWeatherProfiles.snow.dew <= .02, 'snow lens moisture remains subordinate to edge frost')
 assert(lensWeatherProfiles.haze.dew > lensWeatherProfiles.rain.dew)
 assert(lensWeatherProfiles.clear.glow <= .025)
 const qualities = ['high', 'auto', 'balanced', 'low']

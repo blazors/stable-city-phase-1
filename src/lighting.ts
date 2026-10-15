@@ -10,7 +10,7 @@ export const weatherLighting = {
 export const timeLighting: Record<TimeOfDay, { hemisphere: number; fill: number }> = {
   day: { hemisphere: 1.55, fill: .62 },
   sunset: { hemisphere: .88, fill: .35 },
-  night: { hemisphere: .62, fill: .18 },
+  night: { hemisphere: .84, fill: .30 },
 }
 
 export function sceneFog(time: TimeOfDay, weather: Weather, color: string, overviewDistanceOffset = 0) {

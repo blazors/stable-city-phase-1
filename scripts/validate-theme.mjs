@@ -31,14 +31,15 @@ for (const slot of materialSlots) assert.equal(new Set(Object.values(themeSpecs)
 assert.deepEqual(timeLighting, {
   day: { hemisphere: 1.55, fill: .62 },
   sunset: { hemisphere: .88, fill: .35 },
-  night: { hemisphere: .62, fill: .18 },
+  night: { hemisphere: .84, fill: .30 },
 }, 'Stage 9 fill values preserve night and use the authored day/sunset reduction')
 const mix = Number(scene.match(/const themeMix = ([\d.]+)/)?.[1])
 assert(mix >= .2 && mix <= .3, 'outskirts receive 20–30% theme mixing')
 assert.match(scene, /color\.setHSL\([\s\S]*?hsl\.l\)/, 'outskirts keep the original seed lightness')
 assert.match(scene, /emissiveIntensity=\{night \? 1\.4 : \.08\}/, 'night window emission is 1.4')
 assert.match(scene, /const response = theme \? themeSpecs\[theme\]\.materialResponse : null/, 'Theme OFF has no material response override')
-assert.match(scene, /roughness=\{roughness \?\? \(glow \? \.45 : wet \? \.30 : \.82\)\} metalness=\{metalness \?\? \(glow \? \.15 : wet \? \.10 : \.04\)\}/, 'core Theme OFF preserves shared Stage 9 material defaults')
+assert.match(scene, /roughness=\{roughness \?\? \(glow \? \.45 : wet \? \.22 : \.82\)\} metalness=\{metalness \?\? \(glow \? \.15 : wet \? \.10 : \.04\)\}/, 'wet roads stay smoother than the shared dry material default')
+assert.match(scene, /color=\{night \? '#526e7a' : '#547582'\} roughness=\{\.16\} metalness=\{\.08\}/, 'night puddles retain the brighter low-roughness response')
 assert.match(scene, /roughness=\{response\?\.coreBody\.roughness\} metalness=\{response\?\.coreBody\.metalness\}/, 'core body consumes optional theme response')
 assert.match(scene, /roughness=\{response\?\.coreTrim\.roughness\} metalness=\{response\?\.coreTrim\.metalness\}/, 'core trim consumes optional theme response')
 assert.match(scene, /roughness=\{response\?\.coreGlass\.roughness\} metalness=\{response\?\.coreGlass\.metalness\}/, 'core glass consumes optional theme response')

@@ -69,7 +69,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
   }, [items])
   return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={!glow} receiveShadow={!glow}>
     {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
-    <meshStandardMaterial color={color} roughness={roughness ?? (glow ? .45 : wet ? .30 : .82)} metalness={metalness ?? (glow ? .15 : wet ? .10 : .04)} emissive={emissive ?? (glow ? color : '#000000')} emissiveIntensity={emissiveIntensity ?? (glow ? (night ? 1.8 : .08) : 0)} />
+    <meshStandardMaterial color={color} roughness={roughness ?? (glow ? .45 : wet ? .22 : .82)} metalness={metalness ?? (glow ? .15 : wet ? .10 : .04)} emissive={emissive ?? (glow ? color : '#000000')} emissiveIntensity={emissiveIntensity ?? (glow ? (night ? 1.8 : .08) : 0)} />
   </instancedMesh>
 }
 
@@ -212,7 +212,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .10 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .22 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
   }, [time, weather, mode, quality, overviewOffset])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -355,7 +355,7 @@ function RainPuddles({ night, quality, roads }: { night: boolean; quality: Quali
   }, [patches])
   return <instancedMesh ref={ref} args={[undefined, undefined, patches.length]} receiveShadow>
     <planeGeometry />
-    <meshStandardMaterial color={night ? '#405965' : '#547582'} roughness={.24} metalness={.12} />
+    <meshStandardMaterial color={night ? '#526e7a' : '#547582'} roughness={.16} metalness={.08} />
   </instancedMesh>
 }
 
