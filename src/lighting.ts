@@ -8,8 +8,8 @@ export const weatherLighting = {
   snow: { direct: .48, fill: 1.02, fogNear: 245, fogFar: 820 },
 }
 export const timeLighting: Record<TimeOfDay, { hemisphere: number; fill: number }> = {
-  day: { hemisphere: 1.8, fill: .75 },
-  sunset: { hemisphere: 1.0, fill: .42 },
+  day: { hemisphere: 1.55, fill: .62 },
+  sunset: { hemisphere: .88, fill: .35 },
   night: { hemisphere: .62, fill: .18 },
 }
 

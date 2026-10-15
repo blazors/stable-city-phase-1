@@ -24,6 +24,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 | Stage 6 性能证据 | 已完成机制与一次人工矩阵 | 可见 Canvas 帧采样、revision 作废、后台暂停；2026-10-14 完成 Overview 48 格 + Mega 12 格人工浏览器抽查 | 原始逐格 JSON 未落盘，尚不是可重放自动回归 |
 | Stage 7 固定机位与预算 | 已完成 | Overview/Mega 默认固定相机；默认禁用轨道与摇晃；HIGH 2048、AUTO/BALANCED 1024、LOW 512 阴影预算及分级 DPR | 自由观察入口尚未做产品决定 |
 | Stage 8 质量页真实对照 | 已完成 | Quality 页在同一个 Canvas、同一镜头/天气/时段内切换 StableCity 基线与当前主题；切换会生成新的真实采样 revision | 仍需用户观看判断主题提升是否足够 |
+| Stage 9 主题材质分区 | 已完成工程实现与主代理实景抽查 | 三个 Theme 已进入核心建筑、外围城市、巨构、玻璃、植被和发光材质；Theme OFF 保持固定基线；Ember 雨夜 LOW 仍保持主角层级 | Harbor / Verdant / Ember 的最终审美仍需用户评价 |
 | 自动浏览器回归 | 阻断 | 现有源码、构建和人工浏览器验收可继续 | 引入 Playwright 等新依赖前需 ChangeRequest |
 | 外部 AI/API | 延后 | Provider 状态与成本均如实显示为未接入、$0 | API 凭据、预算与批准流程确认后再做 |
 
@@ -46,8 +47,8 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 ## 当前队列与 ChangeRequest
 
-1. 收集用户对 Stage 8 基线/主题对照的视觉反馈，再决定是否调整主题本身。
-2. 若要建立可重放的完整浏览器矩阵，先批准新增浏览器驱动依赖。
+1. 收集用户对 Stage 9 三主题材质分区的视觉反馈，再决定是否继续调整各 Theme 的材质响应。
+2. 下一轮工程重点可转向保存可重放的验收证据；若需新增浏览器驱动依赖，必须先批准 ChangeRequest。
 3. 若要接入真实 Provider / Image / 3D API，先确认服务、密钥管理、预算和批准门。
 4. 真实 SSR、物理水体、体积云/云影、真实大气散射和景深继续延后，避免在性能边界确认前堆叠高成本 pass。
 
@@ -55,7 +56,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 1. 读取本文件并检查 Git 状态、当前分支和最近 checkpoint。
 2. 检查本地开发服务；需要时重新启动并打开 `http://127.0.0.1:5173/`。
-3. 运行 `pnpm validate`、`node scripts/validate-metropolis.mjs`、`node scripts/validate-weather.mjs` 和 `git diff --check`。
+3. 运行 `pnpm validate`、`node scripts/validate-metropolis.mjs`、`node scripts/validate-weather.mjs`、`node scripts/validate-theme.mjs` 和 `git diff --check`。
 4. 在真实浏览器记录 viewport、DPR、质量、天气、镜头、主题状态、revision、FPS、frame time、draw calls、triangles 与控制台错误。
 5. 只推进本进度表当前队列；任何扩大范围的变更先提出 ChangeRequest。
 
@@ -64,4 +65,5 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 - 宏观构图：`docs/macro-composition-validation.md`
 - 天气与镜头：`docs/weather-validation.md`
 - 固定机位与质量预算：`docs/stage7-fixed-camera-validation.md`
+- 主题材质分区：`docs/stage9-theme-material-validation.md`
 - 历史迁移说明：`docs/stable-city-migration-context.md`（非当前事实源）

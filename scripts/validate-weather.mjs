@@ -112,7 +112,7 @@ assert.match(scene, /overviewOffset = mode === 'overview' \? overviewDistanceOff
 assert.match(scene, /smoothstep\(\$\{\(420 \+ overviewOffset\)\.toFixed\(1\)\},\$\{\(950 \+ overviewOffset\)\.toFixed\(1\)\}/, 'water and scene fog share typed overview distance compensation')
 assert.match(scene, /quality === 'balanced' \? \.75 : \.5/, 'balanced and low quality use stable tree and waterfront light budgets')
 assert.match(scene, /quality === 'balanced' \? \.6 : \.3/, 'balanced and low quality use stable window budgets')
-assert.match(scene, /quality === 'low' \? metropolis\.terraces\.filter\(item => item\.tower\)/, 'low quality preserves only skyline-defining terraces')
+assert.match(scene, /quality === 'low' \? allTerraces\.filter\(item => item\.tower\)/, 'low quality preserves only skyline-defining terraces after theme tinting')
 assert.doesNotMatch(scene, /WebGLRenderTarget|DepthTexture|new RenderTarget/, 'weather stage adds no post-process target')
 const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 assert.match(app, /migrateWeather\(persistedUi\?\.weather\)/, 'stored weather migrates legacy options')
