@@ -298,6 +298,8 @@ summary { cursor: pointer; }
 .iteration-history small { color: var(--muted); font-size: 9px; }
 .iteration-history i { color: #7f9592; font-style: normal; }
 .quality-actions { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; }
+.acceptance-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.acceptance-tools button { padding: 7px 10px; font-size: 10px; }
 .quality-details { flex: 1 1 100%; margin-top: 5px; border-top: 1px solid var(--line); padding-top: 14px; }
 .quality-details > summary { color: #d8c29d; font-size: 11px; }
 .quality-checks { max-width: 760px; padding-top: 12px; }
