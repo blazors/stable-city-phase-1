@@ -127,7 +127,8 @@ function Architecture({ theme, night, detail }: { theme: ThemeName | null; night
     }
     return { masses, trim, glass, windows, landscape }
   }, [theme, detail])
-  return <><Boxes items={masses} /><Boxes items={trim} color={theme ? themeSpecs[theme].trim : '#8b9d95'} /><Boxes items={glass} color={theme ? themeSpecs[theme].glass : '#405e67'} /><Boxes items={landscape} /><Boxes items={windows} color={night ? '#f2c17e' : '#687f82'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? 1.4 : .08} glow night={night} /></>
+  const response = theme ? themeSpecs[theme].materialResponse : null
+  return <><Boxes items={masses} roughness={response?.coreBody.roughness} metalness={response?.coreBody.metalness} /><Boxes items={trim} color={theme ? themeSpecs[theme].trim : '#8b9d95'} roughness={response?.coreTrim.roughness} metalness={response?.coreTrim.metalness} /><Boxes items={glass} color={theme ? themeSpecs[theme].glass : '#405e67'} roughness={response?.coreGlass.roughness} metalness={response?.coreGlass.metalness} /><Boxes items={landscape} /><Boxes items={windows} color={night ? '#f2c17e' : '#687f82'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? 1.4 : .08} glow night={night} /></>
 }
 
 const themeMix = .25
@@ -179,13 +180,13 @@ function Megastructure({ accent, theme, night, sunset, quality, time }: { accent
   }, [])
   const spec = theme ? themeSpecs[theme] : null
   return <>
-    <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec ? .76 : .82} metalness={.04} items={[
+    <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} items={[
       { position: [-9, 13, 9], size: [6, 26, 8] }, { position: [9, 13, 9], size: [6, 26, 8] },
       { position: [0, 22, 9], size: [25, 5, 9] },
       { position: [-9, 1, 9], size: [8, 2, 10] }, { position: [9, 1, 9], size: [8, 2, 10] },
     ]} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec ? .58 : .82} metalness={spec ? .12 : .04} items={ribs} />
-    <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec ? .42 : .82} metalness={spec ? .18 : .04} items={[
+    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={ribs} />
+    <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
       { position: [-5.93, 10.5, 9], size: [.12, 18, 7] }, { position: [5.93, 10.5, 9], size: [.12, 18, 7] },
       { position: [0, 21.5, 4.45], size: [23, 1.8, .16] }, megaRoofDeck,
     ]} />
@@ -386,12 +387,12 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={parks} color={theme ? '#ffffff' : '#526f56'} />
     <Boxes items={paths} color={theme ? '#ffffff' : '#a9ac96'} />
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
-    <Boxes items={buildings} />
-    <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} />
+    <Boxes items={buildings} roughness={.88} metalness={.02} />
+    <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} roughness={.90} metalness={.02} />
     <Boxes items={terraces} />
     <Boxes items={trees} foliage />
-    <Boxes items={windows} color={night ? '#eabb7a' : '#496876'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? 1.4 : .08} glow night={night} />
-    <Boxes items={lights} color="#e9b779" glow night={night} />
+    <Boxes items={windows} color={night ? '#eabb7a' : '#496876'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? .85 : .08} glow night={night} />
+    <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? 1.1 : .08} />
     {metropolis.bridges.map(({ x, z, span }) => <group key={x} position={[x, 0, z]}>
       <Boxes color="#b4b6a9" items={[{ position: [0, .65, 0], size: [5, 1, span] }, ...[-1, 1].map(v => ({ position: [0, -1, v * (span / 2 - 5)] as Vec3, size: [3, 3, 1] as Vec3 }))]} />
       <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, span] }))} />
