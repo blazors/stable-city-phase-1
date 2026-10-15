@@ -13,6 +13,10 @@ export type VisualAcceptance = {
   compare: 'baseline' | 'theme'
 }
 
+export function getBenchmarkEnvironment(width: number, height: number, devicePixelRatio: number): 'ready' | 'mismatch' {
+  return width === 1280 && height === 720 && Math.abs(devicePixelRatio - 1) <= 0.01 ? 'ready' : 'mismatch'
+}
+
 export type AcceptanceScenario = VisualAcceptance & {
   id: string
   url: string

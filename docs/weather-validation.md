@@ -126,7 +126,9 @@ HIGH/AUTO 使用两项低频密度打散，BALANCED 一项，LOW 不打散但保
 
 ## Stage 6 · 可信性能采样与组合矩阵
 
-性能采样已改为跟随 React Three Fiber 的实际 Canvas 帧。配置切换会立即作废当前指标并建立新 revision；页面隐藏时暂停并重置采样窗口。每条 READY 样本至少包含 30 个有效帧和 1000 ms 可见采样时间。`frameMs` 表示可见 Canvas 帧节奏，Draw Calls / Triangles 是最近完整渲染帧的 renderer counters，不是 GPU timestamp。
+性能采样已改为跟随 React Three Fiber 的实际 Canvas 帧。配置切换会立即作废当前指标并建立新 revision；页面隐藏时暂停并重置采样窗口。每次配置或可见性重置后先丢弃至少 10 帧且 500 ms 的热身，再采集至少 30 个有效帧和 1000 ms 可见采样时间。`frameMs` 表示正式样本窗口内的可见 Canvas 帧节奏；Draw Calls / Triangles 是窗口末尾最近完整渲染帧的 renderer counters，不是窗口均值、峰值或 GPU timestamp。`loadMs` 记录 Canvas 首次挂载到首帧，只是页面启动测量，不代表每个 URL/配置各自的首帧耗时。
+
+固定验收 URL（`view=quality`）将 Canvas DPR 固定为 1，并要求浏览器窗口为 1280×720、设备 DPR 在 1±0.01 内；不满足时 `data-acceptance-status` 为 `mismatch`，不会进入 READY。普通视图仍按质量档位的 DPR 预算运行。
 
 2026-10-14 在 Codex 内置浏览器、1280 × 720、DPR 1、Vite 开发服务下完成：
 

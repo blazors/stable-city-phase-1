@@ -443,22 +443,27 @@ function CameraDirector({ mode, locked }: { mode: 'overview' | 'mega'; locked: b
 function Metrics({ startedAt, onReady, onUpdate }: { startedAt: number; onReady: (ms: number) => void; onUpdate: (metrics: CanvasMetrics) => void }) {
   const { gl } = useThree()
   const ready = useRef(false)
-  const sample = useRef({ elapsed: 0, frames: 0, recoveringFromHidden: document.hidden })
+  const sample = useRef({ elapsed: 0, frames: 0, warmupElapsed: 0, warmupFrames: 0, warmingUp: true, recoveringFromHidden: document.hidden })
   useEffect(() => {
     const handleVisibility = () => {
-      sample.current = { elapsed: 0, frames: 0, recoveringFromHidden: true }
+      sample.current = { elapsed: 0, frames: 0, warmupElapsed: 0, warmupFrames: 0, warmingUp: true, recoveringFromHidden: true }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
-  useEffect(() => { sample.current = { elapsed: 0, frames: 0, recoveringFromHidden: true } }, [onUpdate])
+  useEffect(() => { sample.current = { elapsed: 0, frames: 0, warmupElapsed: 0, warmupFrames: 0, warmingUp: true, recoveringFromHidden: true } }, [onUpdate])
   useFrame((_state, deltaSeconds) => {
       const now = performance.now()
       const current = sample.current
       if (!ready.current) { ready.current = true; onReady(Math.round(now - startedAt)); return }
-      if (document.hidden) { current.recoveringFromHidden = true; current.elapsed = 0; current.frames = 0; return }
+      if (document.hidden) { current.recoveringFromHidden = true; current.elapsed = 0; current.frames = 0; current.warmupElapsed = 0; current.warmupFrames = 0; current.warmingUp = true; return }
       if (current.recoveringFromHidden) { current.recoveringFromHidden = false; return }
       const delta = deltaSeconds * 1000
+      if (current.warmingUp) {
+        current.warmupElapsed += delta; current.warmupFrames++
+        if (current.warmupElapsed >= 500 && current.warmupFrames >= 10) current.warmingUp = false
+        return
+      }
       // Visible stalls belong to the user-perceived cadence; hidden-page gaps are reset above.
       current.elapsed += delta; current.frames++
       if (current.elapsed >= 1000 && current.frames >= 30) {
@@ -481,13 +486,15 @@ function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', cameraLocked = true, onUpdate, onReady, onError }: {
+export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', cameraLocked = true, benchmark = false, onUpdate, onReady, onError }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
   cameraLocked?: boolean
+  benchmark?: boolean
   onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
+  benchmark = benchmark || new URLSearchParams(window.location.search).get('view') === 'quality'
   const startedAt = useRef(performance.now())
   const p = environmentPalette(time, weather), night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
@@ -502,7 +509,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
       camera.updateProjectionMatrix()
     }}
     shadows
-    dpr={renderQualityBudgets[quality].dpr}
+    dpr={benchmark ? 1 : renderQualityBudgets[quality].dpr}
     gl={{ antialias: true }}
     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}

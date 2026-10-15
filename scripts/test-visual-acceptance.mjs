@@ -5,10 +5,14 @@ import ts from 'typescript'
 const source = await readFile(new URL('../src/visualAcceptance.ts', import.meta.url), 'utf8')
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`
-const { parseVisualAcceptance, createVisualAcceptancePlan } = await import(moduleUrl)
+const { parseVisualAcceptance, createVisualAcceptancePlan, getBenchmarkEnvironment } = await import(moduleUrl)
 
 assert.equal(parseVisualAcceptance('?view=overview&theme=ember'), null, 'only quality view enables temporary acceptance mode')
 assert.equal(parseVisualAcceptance('?view=quality&view=overview').view, 'quality', 'duplicate view fields use the first value')
+assert.equal(getBenchmarkEnvironment(1280, 720, 1), 'ready', 'fixed viewport and DPR are benchmark-ready')
+assert.equal(getBenchmarkEnvironment(1279, 720, 1), 'mismatch', 'a different viewport blocks benchmark readiness')
+assert.equal(getBenchmarkEnvironment(1280, 720, 1.25), 'mismatch', 'a different device pixel ratio blocks benchmark readiness')
+assert.equal(getBenchmarkEnvironment(1280, 720, 1.009), 'ready', 'small device pixel ratio rounding stays within tolerance')
 
 const defaults = parseVisualAcceptance('?view=quality')
 assert.deepEqual({ theme: defaults.theme, mode: defaults.mode, time: defaults.time, weather: defaults.weather, quality: defaults.quality, compare: defaults.compare }, {

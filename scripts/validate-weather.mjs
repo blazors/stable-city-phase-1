@@ -84,7 +84,7 @@ assert.match(precipitation, /uTime\*\(15\.0\+aLayer\*2\.6\)/, 'snow has strong h
 assert.match(precipitation, /varying vec2 vWind/, 'snow has a directional slash silhouette')
 const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
 assert.match(scene, /renderQualityBudgets: Record<QualityPreset, \{ dpr: \[number, number\]; shadowMapSize: number \}> = \{\s*auto: \{ dpr: \[1, 1\.5\], shadowMapSize: 1024 \},\s*high: \{ dpr: \[1, 2\], shadowMapSize: 2048 \},\s*balanced: \{ dpr: \[1, 1\.25\], shadowMapSize: 1024 \},\s*low: \{ dpr: \[1, 1\], shadowMapSize: 512 \},\s*\}/, 'DPR and shadow map resolution follow explicit per-quality budgets')
-assert.match(scene, /dpr=\{renderQualityBudgets\[quality\]\.dpr\}/, 'Canvas DPR follows the selected quality tier')
+assert.match(scene, /dpr=\{benchmark \? 1 : renderQualityBudgets\[quality\]\.dpr\}/, 'acceptance fixes DPR while ordinary Canvas follows the selected quality tier')
 assert.match(scene, /shadow-mapSize=\{\[renderQualityBudgets\[quality\]\.shadowMapSize, renderQualityBudgets\[quality\]\.shadowMapSize\]\}/, 'sun shadow resolution follows the selected quality tier')
 assert.match(scene, /snowCaps\(\[megaRoofDeck, \.\.\.createMegaRoofRibs\(\)\]\)/, 'snow follows the separate hero roof ribs')
 assert.match(scene, /count=\{snowBudgets\[quality\]\}/, 'all qualities retain snow identity')
