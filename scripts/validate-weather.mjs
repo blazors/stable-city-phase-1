@@ -124,7 +124,7 @@ assert.match(app, /data-sample-status=\{sampleStatus\}/, 'runtime exposes sampli
 assert.match(app, /data-config-signature=\{configSignature\}/, 'runtime exposes the exact sampled configuration')
 for (const attribute of ['data-fps', 'data-frame-ms', 'data-calls', 'data-triangles']) assert.match(app, new RegExp(`${attribute}=\\{metrics\\.`), `${attribute} is exposed for browser evidence`)
 assert.match(app, /next: Omit<RenderMetrics, 'configRevision'>/, 'app assigns the active configuration revision to new samples')
-assert.match(app, /weather, theme, enabled, configSignature/, 'history records the full configuration identity')
+assert.match(app, /weather, theme, enabled: sceneEnabled, configSignature/, 'history records the effective rendered configuration identity')
 assert.equal((app.match(/latest: metricsHistory\.at\(-1\) \?\? null/g) ?? []).length, 2, 'exports identify the latest completed visual sample instead of the current information view')
 assert.match(app, /最近视觉样本 · Last visual sample/, 'cost labels retained metrics as the last visual sample')
 const lensSource = fs.readFileSync(new URL('../src/weatherLens.ts', import.meta.url), 'utf8')

@@ -1,57 +1,67 @@
-# StableCity 项目接续记录
+# StableCity 项目事实与进度表
 
-更新时间：2026-10-03（Asia/Shanghai）
+更新时间：2026-10-15（Asia/Shanghai）
 
-## 当前目标
+本文件是项目当前状态的唯一入口。专题实现和验收细节保留在对应证据文档中；旧迁移记录仅作历史参考。
 
-Art-First 3D Web City：先用确定性的 StableCity 作为稳定底座，再通过主题、天气、灯光和镜头形成可比较的视觉场景。当前优先级是宏观城市构图和视觉质量；暂不接入真实 AI、Image API 或 3D API。
+## 当前目标与不可变边界
 
-## 已确认决定
+Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天气、灯光和固定镜头形成可比较的视觉场景。
 
-- StableCity 核心结构保持稳定：16 个核心街区、60 个核心建筑、公共空地、巨构和交通骨架不因主题或天气重新生成。
-- Production Console 使用同一 Run 上下文，Visual 页面与 System 页面互斥切换。
-- 视觉目标：更广阔的城市尺度、河道与公园关系、分层天际线、受控灯光和非摄影写实的风格化氛围。
-- Astra 只用于宏观构图、灯光、色彩、镜头和整体审美判断；普通工程、验证和 UI 收口可用其他模型继续。
+- 核心结构锁定：16 个核心街区、60 个核心建筑、公共空地、巨构与交通骨架不因主题或天气重建。
+- Production Console 保持同一 Run；Visual 与 System 页面互斥显示，一次只承载一种观察任务。
+- 视觉方向：广阔城市尺度、河道与公园关系、分层天际线、强主角剪影、受控色彩与非摄影写实氛围。
+- 当前仍为 local-first procedural preview；未接入真实模型、Image API、3D API 或 Provider。
+- 新依赖、删除文件、API 接入和受保护核心规则变更必须先提出 ChangeRequest。
 
-## 已完成且有验证证据
+## 阶段进度
 
-- 天气氛围：晴空光晕、层云晚霞、薄雾柔光、日落和夜景调色，见 `docs/weather-validation.md`。
-- 宏观城市第一轮：外围从规则矩形扩展为沿河城市，加入弯曲河道、滨水绿带、公园、桥梁、低层街区和远景建筑群。
-- 画面入口：Overview 与 Mega Showcase 保持两个固定模式；总览标题改为“沿河生长的城市”。
-- 工程校验：`scripts/validate-metropolis.mjs` 验证多种 seed 的确定性、核心区保护、河道避让和桥梁跨岸。
-- 最近一次桌面采样（1440×960、Vite 开发服务）：约 60 FPS、16.6–16.7 ms、52 draws、约 115,082 tris；这是当前机器和当前取景的实测，不代表所有设备。
-- `pnpm validate` 已通过；浏览器最终错误/警告采样为空。
+| 阶段 | 状态 | 已验证结果 | 仍需处理 |
+| --- | --- | --- | --- |
+| StableCity 基础 | 已完成 | 确定性 Seed、城市语法、16 街区、60 建筑、巨构、交通与结构签名 | 不得被主题/天气破坏 |
+| Stage 4 宏观构图 | 已完成工程实现 | 弯曲河道、滨水绿带、公园、桥梁、次峰与 288 个外围建筑；多 Seed 几何校验通过 | 用户最终审美评分仍待完成 |
+| 天气与氛围 | 已完成当前范围 | 晴、雨、雪、雾四类；湿路/水洼、暴雪/结冰、高度雾、水面、云层、光晕和天气镜头层 | 当前为艺术化近似，不宣称 SSR 或物理体积模拟 |
+| Stage 6 性能证据 | 已完成机制与一次人工矩阵 | 可见 Canvas 帧采样、revision 作废、后台暂停；2026-10-14 完成 Overview 48 格 + Mega 12 格人工浏览器抽查 | 原始逐格 JSON 未落盘，尚不是可重放自动回归 |
+| Stage 7 固定机位与预算 | 已完成 | Overview/Mega 默认固定相机；默认禁用轨道与摇晃；HIGH 2048、AUTO/BALANCED 1024、LOW 512 阴影预算及分级 DPR | 自由观察入口尚未做产品决定 |
+| Stage 8 质量页真实对照 | 已完成 | Quality 页在同一个 Canvas、同一镜头/天气/时段内切换 StableCity 基线与当前主题；切换会生成新的真实采样 revision | 仍需用户观看判断主题提升是否足够 |
+| 自动浏览器回归 | 阻断 | 现有源码、构建和人工浏览器验收可继续 | 引入 Playwright 等新依赖前需 ChangeRequest |
+| 外部 AI/API | 延后 | Provider 状态与成本均如实显示为未接入、$0 | API 凭据、预算与批准流程确认后再做 |
 
-## 当前工作区状态
+## 当前运行基线
 
-- 稳定城市、外围都市、天气氛围、Production Console、运行报告和校验脚本均已提交到当前分支；最新接续记录见 `docs/stable-city-migration-context.md`。
-- `AGENTS.md`、`output/` 和既有 `tmp/` 内容视为已有工作区内容，不能因本记录清理或删除。
-- 本地开发服务可能随会话停止；继续时要先检查 `http://127.0.0.1:5173/` 是否可用，再刷新浏览器。
+- Stage 6 验收环境：1280×720、DPR 1、本机内置浏览器。
+- 代表性样本约 59–61 FPS、16.3–17.0 ms。`frameMs` 是 Canvas 采样节拍，draw calls / triangles 是最近渲染帧计数，不是 GPU 时间或跨设备保证。
+- Overview 夜雨：HIGH 87 draws / 208,324 tris；LOW 55 / 75,180。
+- Overview 夜雪：HIGH 87 / 207,122；LOW 55 / 77,818。
+- Mega 夜雨：HIGH 77 / 206,212；LOW 45 / 73,068。
+- Mega 夜雪：HIGH 77 / 205,010；LOW 45 / 75,706。
+- 2026-10-03 的约 52 draws、107k–115k tris 是历史版本读数，不再代表当前场景。
 
-## 下一步（等待 Astra）
+## 验收矩阵
 
-1. 评审河道—公园—核心城市—远景天际线的宏观主次关系。
-2. 评审 Overview 与 Mega Showcase 的镜头语言、前中远景和巨构支配力。
-3. 评审日落/夜景的灯光层级、河面反射和远景降饱和策略。
-4. 只有在视觉方向明确后，才进入更高级的体积云、云影、景深或其他后处理；不先堆特效。
+- 自动工程检查：TypeScript、Vite build、源码契约、城市确定性和天气数学校验必须全部通过。
+- 浏览器验收：固定相机、单 Canvas 主题对照、采样签名/revision、风险天气和控制台错误由主代理实测。
+- 视觉验收：用户对宏观城市、灯光、天气强度和主题对照的评价仍是最终标准。
+- 设备验收：长时间闪烁录屏、真实移动 GPU 与多设备性能尚未完成，不得写成已通过。
 
-## 继续任务的固定恢复流程
+## 当前队列与 ChangeRequest
 
-1. 读取本文件和 `git status`。
-2. 检查当前分支、最近 checkpoint 和本地开发服务。
-3. 先跑 `pnpm validate` 与 `node scripts/validate-metropolis.mjs`。
-4. 用浏览器重新打开 Overview，记录当前 FPS、帧耗时、draw calls、三角形和首帧时间。
-5. 只处理本记录中“下一步”对应的内容；新依赖、删除文件、API 接入或受保护核心规则变更先提出 ChangeRequest。
+1. 收集用户对 Stage 8 基线/主题对照的视觉反馈，再决定是否调整主题本身。
+2. 若要建立可重放的完整浏览器矩阵，先批准新增浏览器驱动依赖。
+3. 若要接入真实 Provider / Image / 3D API，先确认服务、密钥管理、预算和批准门。
+4. 真实 SSR、物理水体、体积云/云影、真实大气散射和景深继续延后，避免在性能边界确认前堆叠高成本 pass。
 
-## 工程收口验证（2026-10-03）
+## 固定恢复流程
 
-- `pnpm validate`：TypeScript、Vite build 和 8 项源码契约全部通过。
-- `node scripts/validate-metropolis.mjs`：4 个 seed 的确定性、有限几何、核心保护、河道避让和桥梁跨岸全部通过。
-- 内置浏览器抽查：Production Console 的 Overview、Assets、Quality、Pipeline、Cost、Debug、Intelligence 七个视图均能互斥切换；每次只保留一个主视图。
-- 运行时组合抽查：3 个 Theme × 3 个时段 × 3 种天气共 27 组，以及 AUTO/HIGH/BALANCED/LOW 四档质量均能渲染并显示实时指标；抽查读数为约 60 FPS、16.7 ms、52 draws、107,054–115,082 tris。
-- 仍未验证长时间闪烁录屏、真实移动设备 GPU 和用户视觉评分；这些属于后续验收，不伪造为已完成。
+1. 读取本文件并检查 Git 状态、当前分支和最近 checkpoint。
+2. 检查本地开发服务；需要时重新启动并打开 `http://127.0.0.1:5173/`。
+3. 运行 `pnpm validate`、`node scripts/validate-metropolis.mjs`、`node scripts/validate-weather.mjs` 和 `git diff --check`。
+4. 在真实浏览器记录 viewport、DPR、质量、天气、镜头、主题状态、revision、FPS、frame time、draw calls、triangles 与控制台错误。
+5. 只推进本进度表当前队列；任何扩大范围的变更先提出 ChangeRequest。
 
-## 明确保留的工作
+## 专题证据
 
-- 当前没有真实 Provider、模型、Image API 或 3D API 调用；接入它们必须另立 ChangeRequest。
-- 宏观构图、镜头语言、天际线主次、灯光层级和高级后处理保留给 GPT-6 Astra 阶段。
+- 宏观构图：`docs/macro-composition-validation.md`
+- 天气与镜头：`docs/weather-validation.md`
+- 固定机位与质量预算：`docs/stage7-fixed-camera-validation.md`
+- 历史迁移说明：`docs/stable-city-migration-context.md`（非当前事实源）
