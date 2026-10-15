@@ -37,11 +37,17 @@ export type RenderMetrics = { fps: number; frameMs: number; calls: number; trian
 type CanvasMetrics = Omit<RenderMetrics, 'configRevision'>
 export type QualityPreset = 'auto' | 'high' | 'balanced' | 'low'
 export const waterWaveBudgets: Record<QualityPreset, number> = { auto: 3, high: 3, balanced: 2, low: 1 }
-const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; dpr: [number, number]; waterLayers: number }> = {
-  auto: { detail: 1, traffic: 16, dpr: [1, 1.5], waterLayers: waterWaveBudgets.auto },
-  high: { detail: 1, traffic: 16, dpr: [1, 2], waterLayers: waterWaveBudgets.high },
-  balanced: { detail: .72, traffic: 10, dpr: [1, 1.25], waterLayers: waterWaveBudgets.balanced },
-  low: { detail: .45, traffic: 6, dpr: [1, 1], waterLayers: waterWaveBudgets.low },
+export const renderQualityBudgets: Record<QualityPreset, { dpr: [number, number]; shadowMapSize: number }> = {
+  auto: { dpr: [1, 1.5], shadowMapSize: 1024 },
+  high: { dpr: [1, 2], shadowMapSize: 2048 },
+  balanced: { dpr: [1, 1.25], shadowMapSize: 1024 },
+  low: { dpr: [1, 1], shadowMapSize: 512 },
+}
+const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; waterLayers: number }> = {
+  auto: { detail: 1, traffic: 16, waterLayers: waterWaveBudgets.auto },
+  high: { detail: 1, traffic: 16, waterLayers: waterWaveBudgets.high },
+  balanced: { detail: .72, traffic: 10, waterLayers: waterWaveBudgets.balanced },
+  low: { detail: .45, traffic: 6, waterLayers: waterWaveBudgets.low },
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
@@ -390,13 +396,14 @@ function Transport({ night, count }: { night: boolean; count: number }) {
   </>
 }
 
-function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
+function CameraDirector({ mode, locked }: { mode: 'overview' | 'mega'; locked: boolean }) {
   const { camera, size } = useThree()
   useLayoutEffect(() => {
+    if (!locked) return
     camera.position.set(...cameraPosition(mode, size.width / size.height))
     camera.lookAt(...cameraViews[mode].target)
     camera.updateProjectionMatrix()
-  }, [camera, mode, size.width, size.height])
+  }, [camera, locked, mode, size.width, size.height])
   return null
 }
 
@@ -441,10 +448,11 @@ function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', onUpdate, onReady, onError }: {
+export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', cameraLocked = true, onUpdate, onReady, onError }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
+  cameraLocked?: boolean
   onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
   const startedAt = useRef(performance.now())
@@ -461,24 +469,24 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
       camera.updateProjectionMatrix()
     }}
     shadows
-    dpr={config.dpr}
+    dpr={renderQualityBudgets[quality].dpr}
     gl={{ antialias: true }}
     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />
     <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} quality={quality} />
-    <CameraDirector mode={mode} />
+    <CameraDirector mode={mode} locked={cameraLocked} />
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
-    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
+    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} mode={mode} quality={quality} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape night={night} weather={weather} quality={quality} />
     {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
     {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure accent={enabled ? themeSpecs[theme].accent : '#b1a286'} night={night} sunset={time === 'sunset'} time={time} quality={quality} /><Transport night={night} count={config.traffic} />
-    <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
-    {mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
+    <OrbitControls key={mode} makeDefault enabled={!cameraLocked} target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
+    {!cameraLocked && mode === 'overview' && <CameraShake intensity={.35} maxYaw={.025} maxPitch={.018} maxRoll={.006} yawFrequency={.07} pitchFrequency={.05} rollFrequency={.04} />}
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={weather} quality={quality} mode={mode} />
     {weather === 'haze' && <HeightFog color={fog.color} mode={mode} quality={quality} />}
