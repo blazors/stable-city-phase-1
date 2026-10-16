@@ -23,3 +23,11 @@ Automated validation covers four seeds, protected-core and river clearance, brid
 新轮廓使用现有 `Boxes`/InstancedMesh 路径新增单一批次，继续响应主题主体色，且在 LOW 保留。工程验证覆盖多 Seed 确定性、Stage 15 建筑清单签名、上层体量归属与包围盒、核心/河流净空、主题着色和批次调用点。
 
 主代理在内置浏览器以 1280×720、DPR 1、Harbor / Overview / LOW 做了日落、夜晚与雪夜复核：近景花园街区、远侧街坊与双峰塔楼已出现可辨认的退台轮廓，核心巨构仍是第一焦点，雪盖跟随缩小后的实际屋面，没有保留整块悬浮顶板。晴朗日落样本为 59.99 FPS / 16.67 ms / 56 draws / 76,444 triangles，晴朗夜晚样本为 58.96 FPS / 16.96 ms / 56 draws / 76,444 triangles，雪夜样本为 60.38 FPS / 16.56 ms / 58 draws / 80,368 triangles，Canvas 首帧初始化 156 ms。相对 Stage 15 LOW 夜景样本，晴朗场景增加 1 draw 与 1,296 triangles；FPS 接近显示刷新上限，只记录为本机可见页面样本，不推导 GPU 成本。
+
+## Stage 17 · 外围立面节奏与材质明暗
+
+在 Stage 16 的逻辑建筑清单、`visibleBodies` 与 `upperMasses` 上派生三类立面面板：garden 为宽水平带，neighborhood 为中等宽度的竖向带，tower 为窄高竖带。每栋建筑主体前面与左面各一块；tower 的上层体量也各一块。面板锚定到对应可见体量的实际位置和尺寸，薄盒向墙内嵌入，避免因偏移上层体量产生悬浮。`buildings` 内容与既有 RNG 消耗保持不变；garden、neighborhood、tower 主体采用递减的源明度，主题只向玻璃色偏移色相/饱和度并保留原明度。
+
+立面使用一个共享 `Boxes` / InstancedMesh 批次，LOW 不筛除立面；每个盒体为 12 triangles，当前 291 栋建筑、27 栋 tower 派生 636 个面板，共 7,632 triangles。窗户数量与原有楼层筛选保持一致，只按街区类型调整尺寸；窗户仍受短主体顶边裁切，发光强度不变。自动校验覆盖多 Seed 确定性、Stage 15 建筑签名、面板样式/归属/贴墙边界、核心/河道净空、三类源明度、主题色调、单批次与 LOW 常驻契约。
+
+主代理在内置浏览器以 1280×720、DPR 1、Harbor / Overview / Clear / LOW 做了日落、夜晚与 Theme OFF 复核：浅色横向花园住宅、中灰街坊和深色塔楼竖带在固定总览机位下可以区分，核心巨构仍保持第一视觉焦点；Theme OFF 后三类立面明暗关系继续存在。日落样本为 60.01 FPS / 16.66 ms / 57 draws / 84,076 triangles，夜晚样本为 59.99 FPS / 16.67 ms / 57 draws / 84,076 triangles，Theme OFF 夜晚为 59.97 FPS / 16.67 ms / 57 draws / 84,076 triangles，Canvas 首帧初始化 113 ms，浏览器未记录 error。相对 Stage 16 晴朗 LOW 样本增加 1 draw 与 7,632 triangles，和实际面板实例预算一致；FPS 接近显示刷新上限，不推导 GPU 成本。用户最终审美评价仍待完成。

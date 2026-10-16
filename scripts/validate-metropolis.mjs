@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import ts from 'typescript'
-import { Vector3 } from 'three'
+import { Color, Vector3 } from 'three'
 
 // Execute the actual generators without adding a test runner or emitting build files.
 async function sourceModule(file) {
@@ -109,6 +109,7 @@ const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].s
   return Math.abs(z - riverCenter(px)) - d / 2 < riverHalfWidth(px)
 })
 const buildingSignatures = new Map([[0, 'ceaa3081'], [1, 'c2372da5'], [240319, 'eb5974fa'], [4294967295, '90d3a96f']])
+const windowCounts = new Map([[0, 786], [1, 784], [240319, 802], [4294967295, 792]])
 const signature = items => {
   let hash = 2166136261
   for (const character of JSON.stringify(items)) { hash ^= character.charCodeAt(0); hash = Math.imul(hash, 16777619) }
@@ -119,6 +120,7 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   assert.equal(validateStableCity(city).valid, true, `core contract: ${seed}`)
   assert.deepEqual(scene, generateMetropolis(seed), `deterministic outskirts: ${seed}`)
   assert.equal(signature(scene.buildings), buildingSignatures.get(seed), `Stage 15 building masses stay unchanged: ${seed}`)
+  assert.equal(scene.windows.length, windowCounts.get(seed), `Stage 16 window count stays unchanged: ${seed}`)
   const civicApron = scene.buildings.filter(({ position: [x, , z] }) => Math.abs(x) < 57 && z >= 54)
   assert(civicApron.length > 0, 'civic apron and skyline valley exist')
   assert(civicApron.every(({ size: [, height] }) => height <= 8), 'open civic apron and skyline valley stay low')
@@ -134,6 +136,36 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   assert.equal(scene.terraces.length, scene.buildings.length, 'every outer building receives exactly one terrace')
   assert(scene.upperMasses.length > 100 && scene.upperMasses.length <= scene.buildings.length, 'upper masses stay a bounded subset of outer buildings')
   assert(scene.upperMasses.some(item => item.upperMassStyle === 'garden') && scene.upperMasses.some(item => item.upperMassStyle === 'tower') && scene.upperMasses.some(item => item.upperMassStyle === 'neighborhood'), 'all three district silhouette treatments are represented')
+  const towerCount = scene.buildings.filter(item => item.tower).length
+  assert.equal(scene.facadePanels.length, scene.buildings.length * 2 + towerCount * 2, 'every building body and tower upper mass has one front and one left facade panel')
+  assert.equal(scene.facadePanels.length, 636, 'facade panels use the expected 636 instances')
+  assert(scene.facadePanels.length * 12 <= 8000, 'facade panels stay within the 8,000 triangle budget')
+  assert(scene.facadePanels.every(item => ['garden', 'neighborhood', 'tower'].includes(item.facadeStyle)), 'all panels use one of the three facade rhythms')
+  assert(scene.facadePanels.some(item => item.facadeStyle === 'garden') && scene.facadePanels.some(item => item.facadeStyle === 'neighborhood') && scene.facadePanels.some(item => item.facadeStyle === 'tower'), 'all three facade rhythms are represented')
+  const lightness = style => new Color(scene.visibleBodies.find(item => item.color === ({ garden: '#b7b39b', neighborhood: '#82958a', tower: '#455d65' })[style]).color).getHSL({ h: 0, s: 0, l: 0 }).l
+  assert(lightness('garden') > lightness('neighborhood') && lightness('neighborhood') > lightness('tower'), 'district body colors preserve garden, neighborhood and tower lightness order')
+  for (const building of scene.buildings) {
+    const panels = scene.facadePanels.filter(item => item.buildingIndex === scene.buildings.indexOf(building))
+    const upper = scene.upperMasses.find(item => item.buildingIndex === scene.buildings.indexOf(building))
+    assert.equal(panels.filter(item => item.massPart === 'body').length, 2, 'each building body has exactly two facade panels')
+    assert.equal(panels.filter(item => item.massPart === 'upper').length, building.tower ? 2 : 0, 'only tower upper masses receive the additional facade pair')
+    assert.equal(new Set(panels.map(item => item.facadeStyle)).size, 1, 'all panels on a building share its district style')
+    if (building.tower) assert(upper && panels.every(item => item.facadeStyle === 'tower'), 'tower panels follow the tower upper mass')
+  }
+  for (const panel of scene.facadePanels) {
+    const mass = panel.massPart === 'upper' ? scene.upperMasses.find(item => item.buildingIndex === panel.buildingIndex) : scene.visibleBodies[panel.buildingIndex]
+    assert(mass, 'facade panel references its visible mass segment')
+    const [x, y, z] = panel.position, [w, h, d] = panel.size
+    const [mx, my, mz] = mass.position, [mw, mh, md] = mass.size
+    assert(Math.abs(y - my) + h / 2 <= mh / 2 + 1e-9, 'facade rhythm stays within its owner mass height')
+    assert(Math.abs(x - mx) + w / 2 <= mw / 2 + .021 && Math.abs(z - mz) + d / 2 <= md / 2 + .021, 'facade panel stays inside its owner footprint with only a shallow wall inset')
+    if (panel.face === 'front') assert(Math.abs((z - d / 2) - (mz - md / 2)) <= .021, 'front panel penetrates the wall instead of floating')
+    else assert(Math.abs((x - w / 2) - (mx - mw / 2)) <= .021, 'left panel penetrates the wall instead of floating')
+    const majorFaceSize = panel.face === 'front' ? w : d
+    if (panel.facadeStyle === 'garden') assert(majorFaceSize > h, 'garden rhythm reads as a horizontal band')
+    else assert(h > majorFaceSize, 'neighborhood and tower rhythms read as vertical bands')
+    assert(!overlapsCore(panel) && !overlapsRiver(panel), 'facade panel preserves protected core and river clearance')
+  }
   for (const upper of scene.upperMasses) {
     const [x, y, z] = upper.position, [width, height, depth] = upper.size
     assert(upper.size.every(value => Number.isFinite(value) && value > 0), 'upper mass dimensions are finite and positive')
@@ -168,6 +200,14 @@ for (const seed of [0, 1, 240319, 4294967295]) {
     const body = scene.visibleBodies[window.buildingIndex]
     const upper = scene.upperMasses.find(item => item.buildingIndex === window.buildingIndex)
     if (upper) assert(window.position[1] + window.size[1] / 2 <= body.position[1] + body.size[1] / 2 + 1e-9, 'stepped building windows stay on the shortened visible body')
+    const building = scene.buildings[window.buildingIndex]
+    if (window.size[2] === .06) {
+      assert(Math.abs(window.position[2] + window.size[2] / 2 - (building.position[2] - building.size[2] / 2)) < 1e-9, 'front windows stay flush with their building face')
+      assert(Math.abs(window.position[0] - building.position[0]) + window.size[0] / 2 <= building.size[0] / 2, 'front windows stay inside their face width')
+    } else {
+      assert(Math.abs(window.position[0] + window.size[0] / 2 - (building.position[0] - building.size[0] / 2)) < 1e-9, 'left windows stay flush with their building face')
+      assert(Math.abs(window.position[2] - building.position[2]) + window.size[2] / 2 <= building.size[2] / 2, 'left windows stay inside their face width')
+    }
   }
   const pairedBuildings = scene.buildings.filter((building, index, buildings) => buildings.slice(index + 1).some(other =>
     !building.tower && !other.tower && Math.abs(Math.abs(building.position[0] - other.position[0]) - 6.8) < 1e-9 && Math.abs(building.position[2] - other.position[2]) <= 1
@@ -182,10 +222,10 @@ for (const seed of [0, 1, 240319, 4294967295]) {
       assert(item.size.every(n => Number.isFinite(n) && n > 0), `${name}: positive dimensions`)
     }
   }
-  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
     for (const item of scene[name]) assert(!overlapsCore(item), `${name}: protected core intrusion ${JSON.stringify(item)}`)
   }
-  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'terraces', 'roads']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads']) {
     for (const item of scene[name]) assert(!overlapsRiver(item), `${name}: river intrusion ${JSON.stringify(item)}`)
   }
   for (const bridge of scene.bridges) {

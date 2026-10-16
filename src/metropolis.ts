@@ -1,6 +1,7 @@
 type Box = { position: [number, number, number]; size: [number, number, number]; color?: string; tower?: boolean }
 type UpperMass = Box & { upperMassStyle: 'garden' | 'tower' | 'neighborhood'; buildingIndex: number }
 type WindowBox = Box & { buildingIndex: number }
+type FacadePanel = Box & { facadeStyle: 'garden' | 'neighborhood' | 'tower'; buildingIndex: number; massPart: 'body' | 'upper'; face: 'front' | 'left' }
 
 // Shared by land placement and the water shader; the river stays outside the locked core.
 export const riverCenter = (x: number) => 84 + Math.sin(x / 95) * 24 - .002 * Math.max(-x, 0) ** 2
@@ -15,7 +16,7 @@ export const riverShader = `
 export function generateMetropolis(seed: number) {
   let state = seed >>> 0
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296 }
-  const land: Box[] = [], buildings: Box[] = [], visibleBodies: Box[] = [], upperMasses: UpperMass[] = [], roofs: Box[] = [], windows: WindowBox[] = [], parks: Box[] = [], trees: Box[] = [], paths: Box[] = [], lights: Box[] = [], routeLights: Box[] = []
+  const land: Box[] = [], buildings: Box[] = [], visibleBodies: Box[] = [], upperMasses: UpperMass[] = [], facadePanels: FacadePanel[] = [], roofs: Box[] = [], windows: WindowBox[] = [], parks: Box[] = [], trees: Box[] = [], paths: Box[] = [], lights: Box[] = [], routeLights: Box[] = []
   const roads: Box[] = [], terraces: Box[] = []
   const southEdge = (x: number) => -156 + Math.sin(x / 65) * 18 + .0006 * x * x
   const northEdge = (x: number) => 252 + Math.sin(x / 80) * 22 - .0005 * x * x
@@ -73,6 +74,8 @@ export function generateMetropolis(seed: number) {
     const color = gardenQuarter ? (random() > .5 ? '#b7b39b' : '#82958a') : (random() > .7 ? '#a5b2ac' : '#5d7c83')
     const addBuilding = (bx: number, bz: number, bw: number, bd: number, bh: number) => {
       buildings.push({ position: [bx, bh / 2, bz], size: [bw, bh, bd], color, tower })
+      const facadeStyle = tower ? 'tower' : gardenQuarter ? 'garden' : 'neighborhood'
+      const facadeColor = facadeStyle === 'garden' ? '#b7b39b' : facadeStyle === 'tower' ? '#455d65' : '#82958a'
       const cellX = Math.round(x / 18), cellZ = Math.round(z / 18)
       const neighborhoodSubset = variant === 0 && cellX % 2 === 0
       const buildingIndex = buildings.length - 1
@@ -85,18 +88,36 @@ export function generateMetropolis(seed: number) {
         const offsetSide = (cellX + cellZ) % 2 === 0 ? 1 : -1
         const offsetX = upperMassStyle === 'garden' ? offsetSide * bw * .08 : upperMassStyle === 'neighborhood' && cellZ % 2 === 0 ? offsetSide * bw * .18 : 0
         const offsetZ = upperMassStyle === 'garden' ? -offsetSide * bd * .08 : upperMassStyle === 'neighborhood' && cellZ % 2 !== 0 ? offsetSide * bd * .18 : 0
-        upper = { position: [bx + offsetX, bh - upperHeight / 2, bz + offsetZ], size: [upperWidth, upperHeight, upperDepth], color, tower, upperMassStyle, buildingIndex }
+        upper = { position: [bx + offsetX, bh - upperHeight / 2, bz + offsetZ], size: [upperWidth, upperHeight, upperDepth], color: facadeColor, tower, upperMassStyle, buildingIndex }
         upperMasses.push(upper)
       }
       const visibleHeight = upper ? bh - upper.size[1] : bh
-      visibleBodies.push(upper
-        ? { position: [bx, visibleHeight / 2, bz], size: [bw, visibleHeight, bd], color, tower }
-        : { position: [bx, bh / 2, bz], size: [bw, bh, bd], color, tower })
+      const body: Box = upper
+        ? { position: [bx, visibleHeight / 2, bz], size: [bw, visibleHeight, bd], color: facadeColor, tower }
+        : { position: [bx, bh / 2, bz], size: [bw, bh, bd], color: facadeColor, tower }
+      visibleBodies.push(body)
+      const addFacadePair = (mass: Box, massPart: FacadePanel['massPart']) => {
+        const [mx, my, mz] = mass.position, [mw, mh, md] = mass.size
+        const horizontal = facadeStyle === 'garden'
+        const panelHeight = horizontal ? Math.min(.28, mh * .12) : mh * .72
+        const panelWidth = horizontal ? mw * .72 : mw * (facadeStyle === 'tower' ? .11 : .22)
+        const panelDepth = horizontal ? md * .72 : facadeStyle === 'tower' ? md * .11 : Math.min(md * .22, mh * .42)
+        const boundedPanelWidth = horizontal || facadeStyle === 'tower' ? panelWidth : Math.min(panelWidth, mh * .42)
+        const panelColor = facadeStyle === 'garden' ? '#737a70' : facadeStyle === 'tower' ? '#82928e' : '#c3c4b0'
+        // The thin panels penetrate the facade by .02 units so they cannot float off the wall.
+        facadePanels.push({ position: [mx, my, mz - md / 2 + .02], size: [boundedPanelWidth, panelHeight, .08], color: panelColor, facadeStyle, buildingIndex, massPart, face: 'front' })
+        facadePanels.push({ position: [mx - mw / 2 + .02, my, mz], size: [.08, panelHeight, panelDepth], color: panelColor, facadeStyle, buildingIndex, massPart, face: 'left' })
+      }
+      addFacadePair(body, 'body')
+      if (facadeStyle === 'tower' && upper) addFacadePair(upper, 'upper')
       roofs.push(upper
         ? { position: [upper.position[0], bh + .12, upper.position[2]], size: [upper.size[0], .24, upper.size[2]], tower }
         : { position: [bx, bh + .12, bz], size: [bw + .15, .24, bd + .15], tower })
       terraces.push({ position: [bx, bh + (tower ? 1.7 : gardenQuarter ? .36 : .7), bz], size: [tower ? bw * .66 : gardenQuarter ? bw * .8 : bw * .35, tower ? 3 : gardenQuarter ? .2 : .9, tower ? bd * .65 : gardenQuarter ? bd * .8 : bd * .45], color: tower ? '#8eaaa7' : gardenQuarter ? '#63816b' : '#84928c', tower })
-      for (let y = 2; y < bh; y += 3.5) if ((Math.floor(y) + variant) % 3 !== 0 && (!upper || y + .15 <= visibleHeight)) { windows.push({ position: [bx + (variant - 1.5) * bw * .1, y, bz - bd / 2 - .03], size: [bw * .38, .3, .06], buildingIndex }); windows.push({ position: [bx - bw / 2 - .03, y, bz], size: [.06, .3, bd * .4], buildingIndex }) }
+      const windowWidth = bw * (facadeStyle === 'garden' ? .42 : facadeStyle === 'tower' ? .30 : .36)
+      const windowDepth = bd * (facadeStyle === 'garden' ? .42 : facadeStyle === 'tower' ? .30 : .36)
+      const windowHeight = facadeStyle === 'neighborhood' ? .3 : .26
+      for (let y = 2; y < bh; y += 3.5) if ((Math.floor(y) + variant) % 3 !== 0 && (!upper || y + .15 <= visibleHeight)) { windows.push({ position: [bx + (variant - 1.5) * bw * .1, y, bz - bd / 2 - .03], size: [windowWidth, windowHeight, .06], buildingIndex }); windows.push({ position: [bx - bw / 2 - .03, y, bz], size: [.06, windowHeight, windowDepth], buildingIndex }) }
     }
     if (!gardenQuarter && cluster < .34 && variant === 2) {
       const gap = 3.4, delta = 1.5 + random() * 1.5, secondHeight = Math.max(2, height - delta)
@@ -126,5 +147,5 @@ export function generateMetropolis(seed: number) {
     routeLights.push({ position: [-79, .24, z], size: [.14, .09, 4.4] })
     routeLights.push({ position: [-75, .24, z], size: [.14, .09, 4.4] })
   }
-  return { land, buildings, visibleBodies, upperMasses, roofs, windows, parks, trees, paths, lights, routeLights, bridges, roads, terraces }
+  return { land, buildings, visibleBodies, upperMasses, facadePanels, roofs, windows, parks, trees, paths, lights, routeLights, bridges, roads, terraces }
 }

@@ -369,6 +369,7 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
       paths: tintSeededItems(metropolis.paths, spec.trim, '#a9ac96'),
       visibleBodies: tintSeededItems(metropolis.visibleBodies, spec.bodyLight, '#ffffff'),
       upperMasses: tintSeededItems(metropolis.upperMasses, spec.bodyLight, '#ffffff'),
+      facadePanels: tintSeededItems(metropolis.facadePanels, spec.glass, '#ffffff'),
       roofs: tintSeededItems(metropolis.roofs, spec.trim, '#8a9c97'),
       terraces: tintSeededItems(metropolis.terraces, spec.bodyDark, '#ffffff'),
       trees: tintSeededItems(metropolis.trees, spec.foliage, '#ffffff'),
@@ -378,6 +379,7 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
   const paths = themed?.paths ?? metropolis.paths
   const visibleBodies = themed?.visibleBodies ?? metropolis.visibleBodies
   const upperMasses = themed?.upperMasses ?? metropolis.upperMasses
+  const facadePanels = themed?.facadePanels ?? metropolis.facadePanels
   const roofs = themed?.roofs ?? metropolis.roofs, allTerraces = themed?.terraces ?? metropolis.terraces
   const allTrees = themed?.trees ?? metropolis.trees
   const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
@@ -394,6 +396,7 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
     <Boxes items={visibleBodies} roughness={.88} metalness={.02} />
     <Boxes items={upperMasses} roughness={.88} metalness={.02} />
+    <Boxes items={facadePanels} roughness={.82} metalness={.04} />
     <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} roughness={.90} metalness={.02} />
     <Boxes items={terraces} />
     <Boxes items={trees} foliage />
