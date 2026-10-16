@@ -367,14 +367,17 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
       land: tintSeededItems(metropolis.land, spec.bodyDark, '#778782'),
       parks: tintSeededItems(metropolis.parks, spec.foliage, '#526f56'),
       paths: tintSeededItems(metropolis.paths, spec.trim, '#a9ac96'),
-      buildings: tintSeededItems(metropolis.buildings, spec.bodyLight, '#ffffff'),
+      visibleBodies: tintSeededItems(metropolis.visibleBodies, spec.bodyLight, '#ffffff'),
+      upperMasses: tintSeededItems(metropolis.upperMasses, spec.bodyLight, '#ffffff'),
       roofs: tintSeededItems(metropolis.roofs, spec.trim, '#8a9c97'),
       terraces: tintSeededItems(metropolis.terraces, spec.bodyDark, '#ffffff'),
       trees: tintSeededItems(metropolis.trees, spec.foliage, '#ffffff'),
     }
   }, [theme])
   const land = themed?.land ?? metropolis.land, parks = themed?.parks ?? metropolis.parks
-  const paths = themed?.paths ?? metropolis.paths, buildings = themed?.buildings ?? metropolis.buildings
+  const paths = themed?.paths ?? metropolis.paths
+  const visibleBodies = themed?.visibleBodies ?? metropolis.visibleBodies
+  const upperMasses = themed?.upperMasses ?? metropolis.upperMasses
   const roofs = themed?.roofs ?? metropolis.roofs, allTerraces = themed?.terraces ?? metropolis.terraces
   const allTrees = themed?.trees ?? metropolis.trees
   const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
@@ -389,7 +392,8 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={parks} color={theme ? '#ffffff' : '#526f56'} />
     <Boxes items={paths} color={theme ? '#ffffff' : '#a9ac96'} />
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
-    <Boxes items={buildings} roughness={.88} metalness={.02} />
+    <Boxes items={visibleBodies} roughness={.88} metalness={.02} />
+    <Boxes items={upperMasses} roughness={.88} metalness={.02} />
     <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} roughness={.90} metalness={.02} />
     <Boxes items={terraces} />
     <Boxes items={trees} foliage />

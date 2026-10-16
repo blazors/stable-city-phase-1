@@ -108,10 +108,17 @@ const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].s
   const px = x + offset * w
   return Math.abs(z - riverCenter(px)) - d / 2 < riverHalfWidth(px)
 })
+const buildingSignatures = new Map([[0, 'ceaa3081'], [1, 'c2372da5'], [240319, 'eb5974fa'], [4294967295, '90d3a96f']])
+const signature = items => {
+  let hash = 2166136261
+  for (const character of JSON.stringify(items)) { hash ^= character.charCodeAt(0); hash = Math.imul(hash, 16777619) }
+  return (hash >>> 0).toString(16)
+}
 for (const seed of [0, 1, 240319, 4294967295]) {
   const city = createStableCity(seed), scene = generateMetropolis(seed)
   assert.equal(validateStableCity(city).valid, true, `core contract: ${seed}`)
   assert.deepEqual(scene, generateMetropolis(seed), `deterministic outskirts: ${seed}`)
+  assert.equal(signature(scene.buildings), buildingSignatures.get(seed), `Stage 15 building masses stay unchanged: ${seed}`)
   const civicApron = scene.buildings.filter(({ position: [x, , z] }) => Math.abs(x) < 57 && z >= 54)
   assert(civicApron.length > 0, 'civic apron and skyline valley exist')
   assert(civicApron.every(({ size: [, height] }) => height <= 8), 'open civic apron and skyline valley stay low')
@@ -122,20 +129,46 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   const parkMouth = scene.parks.filter(({ position: [x], size: [w] }) => w === 3 && x > -115 && x < -45)
   assert.equal(parkMouth.filter(({ size: [, , depth] }) => depth === 22).length, parkMouth.length / 2, 'south-bank park mouth widens continuously')
   assert(scene.buildings.length > 250 && scene.buildings.length <= Math.floor(291 * 1.25), 'controlled density stays within the 25% metropolitan budget without hollowing out the city')
+  assert.equal(scene.visibleBodies.length, scene.buildings.length, 'every logical building has one visible body segment')
   assert.equal(scene.roofs.length, scene.buildings.length, 'every outer building receives exactly one roof')
   assert.equal(scene.terraces.length, scene.buildings.length, 'every outer building receives exactly one terrace')
+  assert(scene.upperMasses.length > 100 && scene.upperMasses.length <= scene.buildings.length, 'upper masses stay a bounded subset of outer buildings')
+  assert(scene.upperMasses.some(item => item.upperMassStyle === 'garden') && scene.upperMasses.some(item => item.upperMassStyle === 'tower') && scene.upperMasses.some(item => item.upperMassStyle === 'neighborhood'), 'all three district silhouette treatments are represented')
+  for (const upper of scene.upperMasses) {
+    const [x, y, z] = upper.position, [width, height, depth] = upper.size
+    assert(upper.size.every(value => Number.isFinite(value) && value > 0), 'upper mass dimensions are finite and positive')
+    assert(upper.position.every(Number.isFinite), 'upper mass position is finite')
+    const index = upper.buildingIndex, base = scene.buildings[index], body = scene.visibleBodies[index]
+    assert(base && body, 'upper mass references one existing logical and visible building')
+    const [bx, by, bz] = base.position, [bw, bh, bd] = base.size
+    const bodyTop = body.position[1] + body.size[1] / 2
+    assert(Math.abs(x - bx) + width / 2 <= bw / 2 + 1e-9 && Math.abs(z - bz) + depth / 2 <= bd / 2 + 1e-9, 'upper mass stays inside its original footprint')
+    assert(Math.abs(bodyTop - (y - height / 2)) < 1e-9, 'visible body and upper mass meet without overlapping volumes')
+    assert(Math.abs(y + height / 2 - (by + bh / 2)) < 1e-9, 'upper mass preserves the original building height')
+    assert(!overlapsCore(upper) && !overlapsRiver(upper), 'upper mass preserves protected core and river clearance')
+  }
   const promenade = scene.paths.find(({ position: [x], size: [width, , depth] }) => Math.abs(x + 77) < 1e-9 && width === 3.6 && depth > 100)
   assert(promenade, 'civic park receives a continuous promenade toward the -66 bridge')
   assert(scene.routeLights.length >= 80 && scene.routeLights.length <= 100, 'bounded route-light network marks the two avenues and park axis')
   assert(scene.routeLights.every(item => !overlapsRiver(item)), 'route-light network stops at the river banks instead of floating over water')
   scene.buildings.forEach((building, index) => {
     const [x, y, z] = building.position, [width, height, depth] = building.size
-    const roof = scene.roofs[index], terrace = scene.terraces[index]
-    assert.deepEqual([roof.position[0], roof.position[2]], [x, z], 'roof stays centered on its building')
-    assert(Math.abs(roof.position[1] - (y + height / 2 + .12)) < 1e-9, 'roof stays attached to the building top')
+    const body = scene.visibleBodies[index], upper = scene.upperMasses.find(item => item.buildingIndex === index)
+    const topMass = upper ?? body, roof = scene.roofs[index], terrace = scene.terraces[index]
+    assert(Math.abs(body.position[1] - body.size[1] / 2) < 1e-9, 'visible body remains grounded at its original base')
+    assert(Math.abs(body.position[1] + body.size[1] / 2 + (upper?.size[1] ?? 0) - height) < 1e-9, 'visible body and upper mass union reaches the original building height')
+    assert(Math.abs(roof.position[0] - topMass.position[0]) < 1e-9 && Math.abs(roof.position[2] - topMass.position[2]) < 1e-9, 'roof follows the actual highest mass center')
+    assert(Math.abs(roof.position[1] - (topMass.position[1] + topMass.size[1] / 2 + .12)) < 1e-9, 'roof aligns to the actual highest mass top')
+    if (upper) assert(roof.size[0] <= topMass.size[0] + 1e-9 && roof.size[2] <= topMass.size[2] + 1e-9, 'stepped roof does not overhang the actual highest mass')
+    else assert(roof.size[0] >= width && roof.size[2] >= depth, 'unstepped roof continues to cover its body')
     assert.deepEqual([terrace.position[0], terrace.position[2]], [x, z], 'terrace stays centered on its building')
-    assert(roof.size[0] >= width && roof.size[2] >= depth, 'roof covers its base mass')
+    assert(body.size[0] <= width && body.size[2] <= depth, 'visible body stays inside the logical building footprint')
   })
+  for (const window of scene.windows) {
+    const body = scene.visibleBodies[window.buildingIndex]
+    const upper = scene.upperMasses.find(item => item.buildingIndex === window.buildingIndex)
+    if (upper) assert(window.position[1] + window.size[1] / 2 <= body.position[1] + body.size[1] / 2 + 1e-9, 'stepped building windows stay on the shortened visible body')
+  }
   const pairedBuildings = scene.buildings.filter((building, index, buildings) => buildings.slice(index + 1).some(other =>
     !building.tower && !other.tower && Math.abs(Math.abs(building.position[0] - other.position[0]) - 6.8) < 1e-9 && Math.abs(building.position[2] - other.position[2]) <= 1
   ))
@@ -149,10 +182,10 @@ for (const seed of [0, 1, 240319, 4294967295]) {
       assert(item.size.every(n => Number.isFinite(n) && n > 0), `${name}: positive dimensions`)
     }
   }
-  for (const name of ['buildings', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
     for (const item of scene[name]) assert(!overlapsCore(item), `${name}: protected core intrusion ${JSON.stringify(item)}`)
   }
-  for (const name of ['buildings', 'terraces', 'roads']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'terraces', 'roads']) {
     for (const item of scene[name]) assert(!overlapsRiver(item), `${name}: river intrusion ${JSON.stringify(item)}`)
   }
   for (const bridge of scene.bridges) {
