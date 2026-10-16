@@ -69,3 +69,17 @@
 结论：当前浏览器控制环境存在约 22.5 FPS 的帧节奏上限，因此这两轮不能证明天气对 FPS 没有影响，也不能用不足 1 FPS 的差值排序性能。稳定可确认的是，LOW 雨天相对晴天增加 2 draws / 1,280 tris，雪天增加 2 draws / 3,918 tris；Stage 11 中跨主题、时段和画质得到的约 1 FPS 不能继续作为天气成本结论。
 
 验收模式现已固定 Canvas DPR=1，并校验浏览器 1280×720 与设备 DPR 1±0.01。实测固定环境返回 `ready`；恢复默认 2048×1152、DPR 1.25 后返回 `mismatch`，不会错误进入 READY。Draw Calls / Triangles 仍是窗口末帧计数；`loadMs` 仍只代表 Canvas 初次挂载。
+
+## Stage 14 三轮中位数与雨滴视觉复核
+
+2026-10-16 在同一内置浏览器重新固定 1280×720、DPR 1，以 `clear → rain → snow`、`rain → snow → clear`、`snow → clear → rain` 三种顺序完成 9 个有效样本。所有样本的验收环境和状态均为 `ready`，配置固定为 `harbor / overview / day / low / theme`。
+
+| Weather | FPS 中位数 | Frame time 中位数 | Draw calls | Triangles |
+| --- | ---: | ---: | ---: | ---: |
+| clear | 60.05 | 16.65 ms | 53 | 73,900 |
+| rain | 60.00 | 16.67 ms | 55 | 75,180 |
+| snow | 60.02 | 16.66 ms | 55 | 77,818 |
+
+本轮运行环境稳定在约 60 FPS 的帧节奏上限；不足 0.05 FPS、0.02 ms 的中位数差异没有性能排序意义，也不能视为 GPU 时间。可重复确认的工作量差异仍是：雨天相对晴天增加 2 draws / 1,280 tris，雪天增加 2 draws / 3,918 tris。
+
+视觉复核固定 `ember / mega / night / rain / theme`，分别观看 LOW 与 BALANCED，并在 BALANCED 观察两个动画时刻。LOW 的边缘雨滴没有压过巨构门洞和暖光；BALANCED 的大雨滴更醒目，但巨构剪影与门洞持续保持第一焦点，没有重复遮断关键形体。因此本轮不把 `lensWeatherProfiles.rain.rain` 从 `.72` 下调，也不改变雨滴密度、尺寸、雨丝、灯光或机位。最终主观验收仍由用户观看决定。
