@@ -380,6 +380,8 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
   const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
   const trees = quality === 'high' || quality === 'auto' ? allTrees : pick(allTrees, quality === 'balanced' ? .75 : .5)
   const windows = quality === 'high' || quality === 'auto' ? metropolis.windows : pick(metropolis.windows, quality === 'balanced' ? .6 : .3)
+  const warmWindows = windows.filter(({ position: [, , z] }) => z <= 92)
+  const coolWindows = windows.filter(({ position: [, , z] }) => z > 92)
   const lights = quality === 'high' || quality === 'auto' ? metropolis.lights : pick(metropolis.lights, quality === 'balanced' ? .75 : .5)
   const terraces = quality === 'low' ? allTerraces.filter(item => item.tower) : allTerraces
   return <>
@@ -391,8 +393,10 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} roughness={.90} metalness={.02} />
     <Boxes items={terraces} />
     <Boxes items={trees} foliage />
-    <Boxes items={windows} color={night ? '#eabb7a' : '#496876'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? .85 : .08} glow night={night} />
-    <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? 1.1 : .08} />
+    <Boxes items={warmWindows} color={night ? '#eabb7a' : '#496876'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? .78 : .08} glow night={night} />
+    <Boxes items={coolWindows} color={night ? '#607f91' : '#496876'} emissive={night ? '#58798c' : undefined} emissiveIntensity={night ? .12 : .04} glow night={night} />
+    <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? .65 : .06} />
+    <Boxes items={metropolis.routeLights} color="#d6a66e" glow night={night} emissiveIntensity={night ? .55 : .025} />
     {metropolis.bridges.map(({ x, z, span }) => <group key={x} position={[x, 0, z]}>
       <Boxes color="#b4b6a9" items={[{ position: [0, .65, 0], size: [5, 1, span] }, ...[-1, 1].map(v => ({ position: [0, -1, v * (span / 2 - 5)] as Vec3, size: [3, 3, 1] as Vec3 }))]} />
       <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, span] }))} />

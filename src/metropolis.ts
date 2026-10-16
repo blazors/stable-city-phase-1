@@ -3,6 +3,7 @@ type Box = { position: [number, number, number]; size: [number, number, number];
 // Shared by land placement and the water shader; the river stays outside the locked core.
 export const riverCenter = (x: number) => 84 + Math.sin(x / 95) * 24 - .002 * Math.max(-x, 0) ** 2
 export const riverHalfWidth = (x: number) => 14 + 8 * Math.exp(-((x + 165) ** 2) / 7000)
+export const riverReflectionSources = [-174, -66, 0, 66, 174] as const
 export const riverShader = `
   float riverCenterAt(float x) { return 84.0+sin(x/95.0)*24.0-.002*pow(max(-x,0.0),2.0); }
   float riverWidthAt(float x) { return 14.0+8.0*exp(-pow(x+165.0,2.0)/7000.0); }
@@ -12,7 +13,7 @@ export const riverShader = `
 export function generateMetropolis(seed: number) {
   let state = seed >>> 0
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296 }
-  const land: Box[] = [], buildings: Box[] = [], roofs: Box[] = [], windows: Box[] = [], parks: Box[] = [], trees: Box[] = [], paths: Box[] = [], lights: Box[] = []
+  const land: Box[] = [], buildings: Box[] = [], roofs: Box[] = [], windows: Box[] = [], parks: Box[] = [], trees: Box[] = [], paths: Box[] = [], lights: Box[] = [], routeLights: Box[] = []
   const roads: Box[] = [], terraces: Box[] = []
   const southEdge = (x: number) => -156 + Math.sin(x / 65) * 18 + .0006 * x * x
   const northEdge = (x: number) => 252 + Math.sin(x / 80) * 22 - .0005 * x * x
@@ -49,7 +50,9 @@ export function generateMetropolis(seed: number) {
     }
     roads.push({ position: [x - 8, -.01, z], size: [2, .12, 18] })
     roads.push({ position: [x, 0, z - 8], size: [18, .12, 2] })
-    const eastPeak = Math.exp(-((x - 126) ** 2 / 2100 + (z - 180) ** 2 / 1800))
+    // Offset the eastern peak from the hero's rear silhouette so Overview reads
+    // as two flanking districts with a deliberate central skyline valley.
+    const eastPeak = Math.exp(-((x - 198) ** 2 / 2300 + (z - 174) ** 2 / 2100))
     const westPeak = Math.exp(-((x + 162) ** 2 / 2600 + (z - 108) ** 2 / 1500))
     const cluster = Math.max(eastPeak, westPeak * .7)
     // A low civic apron and a quiet gap between the two distant peaks keep
@@ -61,7 +64,7 @@ export function generateMetropolis(seed: number) {
     // and slender towers concentrated at the two distant peaks.
     const variant = Math.abs(Math.round(x / 18) + Math.round(z / 18) * 3) % 4
     const tower = !gardenQuarter && cluster > .34
-    const height = 4 + random() * (gardenQuarter ? 4 : 6) + (gardenQuarter ? 0 : cluster * 19)
+    const height = Math.min(38, 4 + random() * (gardenQuarter ? 4 : 6) + (gardenQuarter ? 0 : cluster * 28))
     const width = tower ? 5 + random() * 2 : variant === 0 ? 12 : variant === 1 ? 5 : 8 + random() * 3
     const depth = tower ? 6 + random() * 2 : variant === 1 ? 12 : variant === 0 ? 5 : 7 + random() * 3
     const px = x + random() * 2, pz = z + random() * 2
@@ -82,5 +85,23 @@ export function generateMetropolis(seed: number) {
   for (const { x, z, span } of bridges) for (const side of [-1, 1]) {
     paths.push({ position: [x, .16, z + side * (span / 2 + 10)], size: [5, .16, 20] })
   }
-  return { land, buildings, roofs, windows, parks, trees, paths, lights, bridges, roads, terraces }
+  // A continuous civic promenade connects the main park to the -66 bridge.
+  // It is deliberately off the protected core and shares the existing path batch.
+  const parkBridge = bridges.find(bridge => bridge.x === -66)!
+  const promenadeNorth = parkBridge.z - parkBridge.span / 2 - 8
+  paths.push({ position: [-77, .14, (-96 + promenadeNorth) / 2], size: [3.6, .16, promenadeNorth + 96] })
+  paths.push({ position: [-71.5, .15, promenadeNorth], size: [11, .16, 3.6] })
+
+  // Macro night lighting: two metropolitan avenues and the park promenade form
+  // a readable network without adding real lights or changing the road graph.
+  for (const x of [-126, 126]) for (let z = -108; z <= 216; z += 18) {
+    if ([-6.8, 6.8].some(dx => Math.abs(z - riverCenter(x + dx)) < riverHalfWidth(x + dx) + 13)) continue
+    routeLights.push({ position: [x - 6.8, .11, z], size: [.14, .07, 5.2] })
+    routeLights.push({ position: [x + 6.8, .11, z], size: [.14, .07, 5.2] })
+  }
+  for (let z = -90; z <= promenadeNorth; z += 12) {
+    routeLights.push({ position: [-79, .24, z], size: [.14, .09, 4.4] })
+    routeLights.push({ position: [-75, .24, z], size: [.14, .09, 4.4] })
+  }
+  return { land, buildings, roofs, windows, parks, trees, paths, lights, routeLights, bridges, roads, terraces }
 }

@@ -115,11 +115,19 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   const civicApron = scene.buildings.filter(({ position: [x, , z] }) => Math.abs(x) < 57 && z >= 54)
   assert(civicApron.length > 0, 'civic apron and skyline valley exist')
   assert(civicApron.every(({ size: [, height] }) => height <= 8), 'open civic apron and skyline valley stay low')
+  const eastPeak = scene.buildings.filter(({ position: [x, , z], size: [, height] }) => x > 150 && z > 125 && height >= 25)
+  const westPeak = scene.buildings.filter(({ position: [x, , z], size: [, height] }) => x < -120 && z > 70 && height >= 20)
+  assert(eastPeak.length >= 3 && westPeak.length >= 2, 'flanking skyline peaks use grouped towers rather than isolated needles')
+  assert(scene.buildings.every(({ size: [, height] }) => height <= 38), 'outer skyline remains inside the authored height cap')
   const parkMouth = scene.parks.filter(({ position: [x], size: [w] }) => w === 3 && x > -115 && x < -45)
   assert.equal(parkMouth.filter(({ size: [, , depth] }) => depth === 22).length, parkMouth.length / 2, 'south-bank park mouth widens continuously')
   assert(scene.buildings.length > 250 && scene.buildings.length <= Math.floor(291 * 1.25), 'controlled density stays within the 25% metropolitan budget without hollowing out the city')
   assert.equal(scene.roofs.length, scene.buildings.length, 'every outer building receives exactly one roof')
   assert.equal(scene.terraces.length, scene.buildings.length, 'every outer building receives exactly one terrace')
+  const promenade = scene.paths.find(({ position: [x], size: [width, , depth] }) => Math.abs(x + 77) < 1e-9 && width === 3.6 && depth > 100)
+  assert(promenade, 'civic park receives a continuous promenade toward the -66 bridge')
+  assert(scene.routeLights.length >= 80 && scene.routeLights.length <= 100, 'bounded route-light network marks the two avenues and park axis')
+  assert(scene.routeLights.every(item => !overlapsRiver(item)), 'route-light network stops at the river banks instead of floating over water')
   scene.buildings.forEach((building, index) => {
     const [x, y, z] = building.position, [width, height, depth] = building.size
     const roof = scene.roofs[index], terrace = scene.terraces[index]
@@ -141,7 +149,7 @@ for (const seed of [0, 1, 240319, 4294967295]) {
       assert(item.size.every(n => Number.isFinite(n) && n > 0), `${name}: positive dimensions`)
     }
   }
-  for (const name of ['buildings', 'terraces', 'roads', 'parks', 'trees', 'paths']) {
+  for (const name of ['buildings', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
     for (const item of scene[name]) assert(!overlapsCore(item), `${name}: protected core intrusion ${JSON.stringify(item)}`)
   }
   for (const name of ['buildings', 'terraces', 'roads']) {
