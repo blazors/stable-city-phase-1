@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
-import { generateMetropolis, riverShader } from './metropolis'
+import { generateMetropolis, riverReflectionSources, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
 import { LensWeather } from './LensWeather'
@@ -208,11 +208,13 @@ function Megastructure({ accent, theme, night, sunset, quality, time }: { accent
 
 function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset }) {
   const overviewOffset = mode === 'overview' ? overviewDistanceOffset() : 0
+  const reflectionWeights = [.38, .68, .28, .52, .32] as const
+  const reflectionAnchors = riverReflectionSources.map((x, index) => `reflection+=anchorReflection(world,${x.toFixed(1)},${reflectionWeights[index].toFixed(2)});`).join('\n')
   const material = useRef<ShaderMaterial>(null)
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
     const p = environmentPalette(time, weather)
-      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .22 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uReflectionTier: { value: time === 'night' ? 1 : time === 'sunset' ? .42 : .12 }, uReflectionWeather: { value: weather === 'snow' ? 0 : weather === 'rain' ? .42 : weather === 'haze' ? .55 : 1 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .22 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
   }, [time, weather, mode, quality, overviewOffset])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -231,8 +233,21 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
     <planeGeometry args={[20000, 20000]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`varying vec3 world;
       void main(){ world=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0); }`}
-      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain; uniform float uIce; uniform float uWaveLayers;
+      fragmentShader={`varying vec3 world; uniform float uTime; uniform float uNight; uniform float uReflectionTier; uniform float uReflectionWeather; uniform vec3 uColor; uniform vec3 uHaze; uniform vec3 uSun; uniform vec3 uSunColor; uniform float uReflection; uniform float uRain; uniform float uIce; uniform float uWaveLayers;
       ${riverShader}
+      vec3 anchorReflection(vec3 point,float anchorX,float weight){
+        float riverCenter=riverCenterAt(point.x);
+        float width=riverWidthAt(point.x);
+        float channel=1.0-smoothstep(width-2.0,width+2.0,abs(point.z-riverCenter));
+        float anchor=exp(-pow((point.x-anchorX)/7.5,2.0));
+        float warmBand=anchor*exp(-pow((point.x-anchorX)/2.6,2.0));
+        float ripple=0.72+0.28*sin(point.z*.29+uTime*.8+anchorX*.07);
+        vec3 warm=vec3(.839,.651,.431);
+        vec3 cool=vec3(.345,.475,.549);
+        vec3 coldBase=cool*anchor*channel*ripple*(.07+.045*uNight)*weight;
+        vec3 warmCore=warm*warmBand*channel*ripple*(.035+.13*uNight)*weight;
+        return coldBase+warmCore;
+      }
       ${heightFogGLSL}
       float waveHeight(vec2 p, float scale, float speed, float amplitude, float time) {
         float a=dot(p,vec2(.92,.31))*scale+time*speed;
@@ -277,12 +292,16 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
         float broken=pow(max(0.0,sin(world.x*.8+sin(world.z*1.1)+uTime*.4)),6.0)*dynamicRiver;
         float glint=pow(max(0.0,dot(reflect(-uSun,normal),normalize(cameraPosition-world))),18.0)*channel*dynamicRiver;
         vec3 water=uColor*(.83+.035*ripple);
-        water+=vec3(.65,.39,.14)*shore*broken*(.08+uNight*.18);
+        water+=vec3(.65,.39,.14)*shore*broken*(.025+uNight*.055);
         water+=vec3(.19,.29,.34)*glint*.04*channel;
         vec3 viewDirection=normalize(cameraPosition-world);
         float spec=pow(max(0.0,dot(reflect(-uSun,normal),viewDirection)),150.0);
         float shimmer=.4+.6*pow(max(0.0,sin(world.z*1.5+uTime*.6+sin(world.x*.9))),3.0)*dynamicRiver;
         spec*=1.0-freeze*.98;
+        vec3 reflection=vec3(0.0);
+        ${reflectionAnchors}
+        reflection*=uReflectionWeather*dynamicRiver;
+        water+=reflection*uReflectionTier;
         // Only the curved river channel becomes static ice; the surrounding 20000-unit water plane remains water.
         float iceGrain=.5+.5*sin(world.x*.23+sin(world.z*.11)*2.0)*sin(world.z*.31+world.x*.07);
         vec3 ice=mix(vec3(.30,.43,.49),vec3(.53,.64,.68),iceGrain);

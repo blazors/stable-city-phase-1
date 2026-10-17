@@ -70,6 +70,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 ## 专题证据
 
+- 滨水反射与夜间层次：Water 继续使用单个 20,000×20,000 水面 plane；五个 `riverReflectionSources` 由 TypeScript 展开为固定 GLSL 锚点，暖/冷反射色分别为 #d6a66e 与 #58798c。反射仅作用于河道，日/日落/夜采用 .12/.42/1 强度，雨/雾衰减，雪与河道冰面关闭新增动态反射；现有整岸暖碎光已降低以免叠加。无新增 mesh、pass、API 或依赖。源码测试约束固定锚点、颜色、日夜/天气门控和单水面 plane。2026-10-18 在内置浏览器 Harbor / Overview / Night / Clear / LOW 实测：60.01 FPS、16.66 ms、57 draws、84,076 triangles、Canvas 首帧 121 ms；与上一里程碑对象统计相同。夜景河面保持暗面、反射锚点可辨且未压过 Hero；Snow 状态已确认加载且源码门控关闭新增动态反射。
 - 宏观构图：`docs/macro-composition-validation.md`
 - 天气与镜头：`docs/weather-validation.md`
 - 固定机位与质量预算：`docs/stage7-fixed-camera-validation.md`
