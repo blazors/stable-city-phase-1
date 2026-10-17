@@ -2,6 +2,7 @@ type Box = { position: [number, number, number]; size: [number, number, number];
 type UpperMass = Box & { upperMassStyle: 'garden' | 'tower' | 'neighborhood'; buildingIndex: number }
 type WindowBox = Box & { buildingIndex: number }
 type FacadePanel = Box & { facadeStyle: 'garden' | 'neighborhood' | 'tower'; buildingIndex: number; massPart: 'body' | 'upper'; face: 'front' | 'left' }
+type PublicSpaceSurface = Box & { surface: 'roof' | 'platform' }
 
 // Shared by land placement and the water shader; the river stays outside the locked core.
 export const riverCenter = (x: number) => 84 + Math.sin(x / 95) * 24 - .002 * Math.max(-x, 0) ** 2
@@ -17,6 +18,7 @@ export function generateMetropolis(seed: number) {
   let state = seed >>> 0
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296 }
   const land: Box[] = [], buildings: Box[] = [], visibleBodies: Box[] = [], upperMasses: UpperMass[] = [], facadePanels: FacadePanel[] = [], roofs: Box[] = [], windows: WindowBox[] = [], parks: Box[] = [], trees: Box[] = [], paths: Box[] = [], lights: Box[] = [], routeLights: Box[] = []
+  const publicSpaceStructures: Box[] = [], publicSpaceSnowSurfaces: PublicSpaceSurface[] = [], publicSpaceTreeClearance: Box[] = [], publicSpaceLights: Box[] = []
   const roads: Box[] = [], terraces: Box[] = []
   const southEdge = (x: number) => -156 + Math.sin(x / 65) * 18 + .0006 * x * x
   const northEdge = (x: number) => 252 + Math.sin(x / 80) * 22 - .0005 * x * x
@@ -147,5 +149,37 @@ export function generateMetropolis(seed: number) {
     routeLights.push({ position: [-79, .24, z], size: [.14, .09, 4.4] })
     routeLights.push({ position: [-75, .24, z], size: [.14, .09, 4.4] })
   }
-  return { land, buildings, visibleBodies, upperMasses, facadePanels, roofs, windows, parks, trees, paths, lights, routeLights, bridges, roads, terraces }
+
+  // Stage 18 signatures stay west/east of the existing civic axis; geometry is
+  // appended without consuming the seeded generator's random stream.
+  const pavilionX = -105, pavilionZ = -3
+  const pavilionPlatform: PublicSpaceSurface = { position: [pavilionX, .16, pavilionZ], size: [25, .32, 16], color: '#81948a', surface: 'platform' }
+  publicSpaceStructures.push(pavilionPlatform)
+  publicSpaceSnowSurfaces.push(pavilionPlatform)
+  for (const xSide of [-1, 1]) for (const zSide of [-1, 1]) {
+    publicSpaceStructures.push({ position: [pavilionX + xSide * 9.5, 2.25, pavilionZ + zSide * 5.5], size: [.48, 3.9, .48], color: '#667d79' })
+  }
+  const pavilionLowerRoof: PublicSpaceSurface = { position: [pavilionX, 4.18, pavilionZ], size: [27, .36, 18], color: '#9eaa98', surface: 'roof' }
+  const pavilionUpperRoof: PublicSpaceSurface = { position: [pavilionX, 5.02, pavilionZ], size: [23, .32, 14], color: '#b8b49c', surface: 'roof' }
+  publicSpaceStructures.push(pavilionLowerRoof, pavilionUpperRoof)
+  publicSpaceSnowSurfaces.push(pavilionLowerRoof, pavilionUpperRoof)
+  publicSpaceTreeClearance.push({ position: [pavilionX, 2.5, pavilionZ], size: [29, 5, 20] })
+
+  // The deep-park pergola opens south. Its side posts leave the 3.6-wide
+  // promenade unobstructed, with the rear beam high above the walking surface.
+  const courtyardX = -77, courtyardZ = -40
+  for (const xSide of [-1, 1]) {
+    const x = courtyardX + xSide * 13
+    for (const z of [-52, -28]) publicSpaceStructures.push({ position: [x, 2.05, z], size: [.42, 3.8, .42], color: '#667d79' })
+    publicSpaceStructures.push({ position: [x, 4.02, courtyardZ], size: [.34, .34, 24], color: '#82958a' })
+  }
+  publicSpaceStructures.push({ position: [courtyardX, 4.02, -28], size: [26.34, .34, .34], color: '#9eaa98' })
+  publicSpaceTreeClearance.push({ position: [courtyardX, 2.5, courtyardZ], size: [30, 5, 28] })
+
+  // Restrained warm strips are rendered as one night-only instance batch.
+  for (const x of [-116, -110, -100, -94]) {
+    publicSpaceLights.push({ position: [x, .34, -1], size: [2.2, .12, .16], color: '#d6a66e' })
+    publicSpaceLights.push({ position: [x, .34, -52], size: [2.2, .12, .16], color: '#d6a66e' })
+  }
+  return { land, buildings, visibleBodies, upperMasses, facadePanels, roofs, windows, parks, trees, paths, lights, routeLights, bridges, roads, terraces, publicSpaceStructures, publicSpaceSnowSurfaces, publicSpaceTreeClearance, publicSpaceLights }
 }

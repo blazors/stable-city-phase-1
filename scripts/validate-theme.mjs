@@ -64,6 +64,6 @@ assert.match(scene, /emissive=\{night \? '#58798c' : undefined\} emissiveIntensi
 assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
 assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.55 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
-assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 37, 'Stage 17 adds one shared facade panel box batch callsite')
+assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 39, 'Stage 18 adds one shared landmark structure and one night-only landmark light batch')
 assert.equal([...scene.matchAll(/<instancedMesh\b/g)].length, 5, 'Stage 16 reuses the existing shared instancing mechanism')
 console.log('Theme material slots and response values, Theme OFF defaults, outskirts limits, lighting and batch constraints passed.')

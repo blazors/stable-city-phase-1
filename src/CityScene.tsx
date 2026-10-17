@@ -21,7 +21,7 @@ const metropolis = generateMetropolis(city.seed)
 const snowSurfaces = [
   ...snowCaps(city.buildings.map(b => ({ position: [b.x, b.height + .16, b.z] as Vec3, size: [b.width + .22, .32, b.depth + .22] as Vec3 }))),
   ...snowCaps(city.buildings.map(b => ({ position: [b.x, b.height + .7, b.z] as Vec3, size: [b.width * .57, 1.1, b.depth * .58] as Vec3 }))),
-  ...snowCaps(metropolis.roofs), ...snowCaps(metropolis.parks),
+  ...snowCaps(metropolis.roofs), ...snowCaps(metropolis.parks), ...snowCaps(metropolis.publicSpaceSnowSurfaces),
   ...snowRoadEdges(metropolis.roads),
   ...snowCaps([megaRoofDeck, ...createMegaRoofRibs()]),
   ...snowCaps(city.blocks.filter(b => b.kind === 'void').map(b => ({ position: [b.x, .12, b.z] as Vec3, size: [14, .24, 14] as Vec3 }))),
@@ -401,8 +401,12 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
   const facadePanels = themed?.facadePanels ?? metropolis.facadePanels
   const roofs = themed?.roofs ?? metropolis.roofs, allTerraces = themed?.terraces ?? metropolis.terraces
   const allTrees = themed?.trees ?? metropolis.trees
+  const parkClearTrees = allTrees.filter(tree => !metropolis.publicSpaceTreeClearance.some(bound =>
+    Math.abs(tree.position[0] - bound.position[0]) < (tree.size[0] + bound.size[0]) / 2 &&
+    Math.abs(tree.position[2] - bound.position[2]) < (tree.size[2] + bound.size[2]) / 2,
+  ))
   const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
-  const trees = quality === 'high' || quality === 'auto' ? allTrees : pick(allTrees, quality === 'balanced' ? .75 : .5)
+  const trees = quality === 'high' || quality === 'auto' ? parkClearTrees : pick(parkClearTrees, quality === 'balanced' ? .75 : .5)
   const windows = quality === 'high' || quality === 'auto' ? metropolis.windows : pick(metropolis.windows, quality === 'balanced' ? .6 : .3)
   const warmWindows = windows.filter(({ position: [, , z] }) => z <= 92)
   const coolWindows = windows.filter(({ position: [, , z] }) => z > 92)
@@ -413,6 +417,8 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={parks} color={theme ? '#ffffff' : '#526f56'} />
     <Boxes items={paths} color={theme ? '#ffffff' : '#a9ac96'} />
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
+    <Boxes items={metropolis.publicSpaceStructures} roughness={.78} metalness={.03} />
+    {night && <Boxes items={metropolis.publicSpaceLights} color="#ffffff" emissive="#6b482d" glow night emissiveIntensity={.22} />}
     <Boxes items={visibleBodies} roughness={.88} metalness={.02} />
     <Boxes items={upperMasses} roughness={.88} metalness={.02} />
     <Boxes items={facadePanels} roughness={.82} metalness={.04} />

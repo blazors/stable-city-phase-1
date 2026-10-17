@@ -130,6 +130,23 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   assert(scene.buildings.every(({ size: [, height] }) => height <= 38), 'outer skyline remains inside the authored height cap')
   const parkMouth = scene.parks.filter(({ position: [x], size: [w] }) => w === 3 && x > -115 && x < -45)
   assert.equal(parkMouth.filter(({ size: [, , depth] }) => depth === 22).length, parkMouth.length / 2, 'south-bank park mouth widens continuously')
+  assert.equal(scene.publicSpaceStructures.length, 14, 'Stage 18 uses one bounded structure set for both public-space signatures')
+  assert.equal(scene.publicSpaceLights.length, 8, 'Stage 18 adds exactly eight low-weight night strips')
+  assert.equal(scene.publicSpaceSnowSurfaces.length, 3, 'snow covers only the pavilion platform and two broad eaves')
+  const pavilionPlatform = scene.publicSpaceSnowSurfaces.find(item => item.surface === 'platform')
+  const pavilionRoofs = scene.publicSpaceSnowSurfaces.filter(item => item.surface === 'roof')
+  assert(pavilionPlatform && pavilionRoofs.length === 2, 'waterfront pavilion exposes only its platform and double roof for snow')
+  assert(pavilionRoofs[0].size[0] > pavilionRoofs[1].size[0] && pavilionRoofs[0].size[2] > pavilionRoofs[1].size[2], 'pavilion eaves form a wide horizontal double-roof silhouette')
+  assert(pavilionRoofs.every(item => item.position[1] + item.size[1] / 2 <= 5.5), 'waterfront pavilion stays below the 5.5-unit height cap')
+  const courtyardSideRails = scene.publicSpaceStructures.filter(item => item.size[2] === 24 && item.size[0] < 1)
+  assert.equal(courtyardSideRails.length, 2, 'deep-park signature has two low side rails')
+  assert(scene.publicSpaceStructures.some(item => item.position[2] === -28 && item.size[0] > 26), 'deep-park U has a north cross-rail and remains open to the south')
+  assert(scene.publicSpaceTreeClearance.length === 2, 'tree filtering uses one deterministic footprint per public-space signature')
+  const mainAxisPath = scene.paths.find(item => item.size[0] === 3.6)
+  assert(mainAxisPath, 'existing 3.6-wide promenade remains present')
+  assert(scene.publicSpaceStructures.filter(item => item.position[1] - item.size[1] / 2 < 3.6).every(item =>
+    Math.abs(item.position[0] + 77) >= (item.size[0] + 3.6) / 2 || item.position[2] - item.size[2] / 2 >= -28,
+  ), 'low structure supports leave the 3.6-wide promenade clear')
   assert(scene.buildings.length > 250 && scene.buildings.length <= Math.floor(291 * 1.25), 'controlled density stays within the 25% metropolitan budget without hollowing out the city')
   assert.equal(scene.visibleBodies.length, scene.buildings.length, 'every logical building has one visible body segment')
   assert.equal(scene.roofs.length, scene.buildings.length, 'every outer building receives exactly one roof')
@@ -222,10 +239,10 @@ for (const seed of [0, 1, 240319, 4294967295]) {
       assert(item.size.every(n => Number.isFinite(n) && n > 0), `${name}: positive dimensions`)
     }
   }
-  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads', 'parks', 'trees', 'paths', 'routeLights', 'publicSpaceStructures']) {
     for (const item of scene[name]) assert(!overlapsCore(item), `${name}: protected core intrusion ${JSON.stringify(item)}`)
   }
-  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads']) {
+  for (const name of ['buildings', 'visibleBodies', 'upperMasses', 'facadePanels', 'terraces', 'roads', 'publicSpaceStructures', 'publicSpaceLights']) {
     for (const item of scene[name]) assert(!overlapsRiver(item), `${name}: river intrusion ${JSON.stringify(item)}`)
   }
   for (const bridge of scene.bridges) {
