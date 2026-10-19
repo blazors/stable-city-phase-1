@@ -9,8 +9,10 @@ async function sourceModule(file) {
 }
 
 const { themeSpecs } = await sourceModule('../src/theme.ts')
+const { buildThemeSignature } = await sourceModule('../src/themeSignature.ts')
 const { timeLighting } = await sourceModule('../src/lighting.ts')
 const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
+const signatureSource = fs.readFileSync(new URL('../src/themeSignature.ts', import.meta.url), 'utf8')
 const materialSlots = ['bodyLight', 'bodyDark', 'trim', 'glass', 'foliage', 'emission', 'megaBody', 'megaInset']
 const expectedSlots = {
   harbor: ['#c3c9bc', '#315b66', '#8aaba8', '#254650', '#557762', '#e2b273', '#c3c9bc', '#315b66'],
@@ -28,6 +30,53 @@ for (const [name, spec] of Object.entries(themeSpecs)) {
   assert.deepEqual(spec.materialResponse, expectedResponses[name], `${name} matches the authored roughness and metalness response`)
 }
 for (const slot of materialSlots) assert.equal(new Set(Object.values(themeSpecs).map(spec => spec[slot])).size, 3, `${slot} separates all three themes`)
+const themeNames = ['harbor', 'verdant', 'ember']
+const signatures = themeNames.map(theme => buildThemeSignature(theme))
+for (const [index, theme] of themeNames.entries()) {
+  const signature = signatures[index]
+  assert.deepEqual(signature, buildThemeSignature(theme), `${theme} signature is deterministic`)
+  assert(signature.bodies.length > 0 && signature.bodies.length <= 40, `${theme} body budget is bounded`)
+  assert(signature.accents.length > 0 && signature.accents.length <= 8, `${theme} accent budget is bounded`)
+  assert(signature.attachments.length > 0, `${theme} has Hero attachments`)
+  const allBoxes = [...signature.bodies, ...signature.attachments, ...signature.accents]
+  assert(allBoxes.length <= 120, `${theme} public-space and Hero assets stay within 120 boxes`)
+  assert(allBoxes.length * 12 <= 1440, `${theme} public-space and Hero assets stay within 1,440 box triangles`)
+  assert(allBoxes.every(item => /^#[\da-f]{6}$/i.test(item.color)), `${theme} uses explicit palette colors`)
+  const palette = new Set([themeSpecs[theme].primary, themeSpecs[theme].accent, themeSpecs[theme].trim, themeSpecs[theme].foliage])
+  assert(allBoxes.every(item => palette.has(item.color)), `${theme} signature colors come from its theme spec`)
+  assert.equal(signature.attachments.length, { harbor: 10, verdant: 10, ember: 14 }[theme], `${theme} has the authored bilateral attachment set`)
+  const heroAssets = [...signature.attachments, ...signature.accents.filter(item => item.slot === 'hero')]
+  assert.equal(signature.accents.filter(item => item.slot === 'hero').length, 2, `${theme} has two night-only Hero accents`)
+  for (const attachment of heroAssets) {
+    const [x, y, z] = attachment.position, [width, height, depth] = attachment.size
+    assert(Math.abs(x) - width / 2 >= 12, `${theme} attachment stays outside the protected central zone`)
+    assert(Math.abs(x) + width / 2 <= 20, `${theme} attachment stays inside the Hero x range`)
+    assert(z - depth / 2 >= 4.5 && z + depth / 2 <= 13.5, `${theme} attachment stays inside the Hero z range`)
+    assert(y + height / 2 <= 28.5, `${theme} attachment stays below the Hero height cap`)
+    assert(Math.abs(x) - width / 2 > 3, `${theme} attachment stays clear of the central rotor`)
+  }
+  if (theme === 'harbor') {
+    assert.equal(signature.attachments.filter(item => item.size[1] === 11.4).length, 4, 'Harbor has two gate posts on each side')
+    assert.equal(signature.attachments.filter(item => item.size[1] === .5).length, 2, 'Harbor has one top beam on each side')
+    assert.equal(signature.attachments.filter(item => item.size[0] === 3).length, 4, 'Harbor has two outward corbels on each side')
+  }
+  if (theme === 'verdant') {
+    assert.equal(signature.attachments.filter(item => item.size[1] === .38).length, 6, 'Verdant has three wing shelves on each side')
+    assert.equal(signature.attachments.filter(item => item.size[0] === .24).length, 4, 'Verdant has narrow supports on both sides')
+  }
+  if (theme === 'ember') {
+    assert.equal(signature.attachments.filter(item => item.size[0] === .55).length, 6, 'Ember has three vents on each side')
+    assert.equal(signature.attachments.filter(item => item.size[0] === .92).length, 6, 'Ember has a cap on each vent')
+    for (const side of [-1, 1]) {
+      const vents = signature.attachments.filter(item => Math.sign(item.position[0]) === side && item.size[0] === .55).sort((a, b) => Math.abs(a.position[0]) - Math.abs(b.position[0]))
+      assert(vents[0].size[1] < vents[1].size[1] && vents[1].size[1] < vents[2].size[1], 'Ember vent stacks rise toward each outer edge')
+    }
+  }
+}
+const shapeSignature = signature => JSON.stringify([...signature.bodies, ...signature.attachments, ...signature.accents].map(({ position, size }) => ({ position, size })))
+assert.equal(new Set(signatures.map(shapeSignature)).size, 3, 'all three theme signatures have distinct geometry')
+assert.deepEqual(buildThemeSignature(null), { bodies: [], accents: [], attachments: [] }, 'Theme OFF creates no public-space or Hero assets')
+assert.doesNotMatch(signatureSource, /Math\.random|generateMetropolis|createStableCity|metropolis\.|selectThemeCrownAnchors|ThemeTowerAnchor|crowns/, 'signature generation is isolated from city generators, random streams and tower crowns')
 assert.deepEqual(timeLighting, {
   day: { hemisphere: 1.55, fill: .62 },
   sunset: { hemisphere: .88, fill: .35 },
@@ -64,6 +113,9 @@ assert.match(scene, /emissive=\{night \? '#58798c' : undefined\} emissiveIntensi
 assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
 assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.55 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
-assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 39, 'Stage 18 adds one shared landmark structure and one night-only landmark light batch')
+assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 41, 'Stage 19 adds one signature body batch and one night-only accent batch')
 assert.equal([...scene.matchAll(/<instancedMesh\b/g)].length, 5, 'Stage 16 reuses the existing shared instancing mechanism')
-console.log('Theme material slots and response values, Theme OFF defaults, outskirts limits, lighting and batch constraints passed.')
+assert.match(scene, /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'public-space and Hero attachment boxes share one non-shadowing batch and night accents share one low-emission batch')
+assert.match(scene, /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'Theme OFF does not mount the signature overlay')
+assert.doesNotMatch(scene.match(/function ThemeSignatureOverlay\([\s\S]*?\n\}/)?.[0] ?? '', /quality|detail/, 'LOW retains the complete signature asset set')
+console.log('Theme materials, signature geometry budgets, Theme OFF behavior, lighting and batching contracts passed.')

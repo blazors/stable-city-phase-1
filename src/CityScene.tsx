@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
+import { buildThemeSignature } from './themeSignature'
 import { generateMetropolis, riverReflectionSources, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
@@ -51,7 +52,7 @@ const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; wa
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
-function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false, wet = false, roughness, metalness, emissive, emissiveIntensity }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean; wet?: boolean; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number }) {
+function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false, wet = false, roughness, metalness, emissive, emissiveIntensity, castShadow, receiveShadow }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean; wet?: boolean; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number; castShadow?: boolean; receiveShadow?: boolean }) {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     if (!ref.current) return
@@ -67,7 +68,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
     if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true
     ref.current.computeBoundingSphere()
   }, [items])
-  return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={!glow} receiveShadow={!glow}>
+  return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={castShadow ?? !glow} receiveShadow={receiveShadow ?? !glow}>
     {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
     <meshStandardMaterial color={color} roughness={roughness ?? (glow ? .45 : wet ? .22 : .82)} metalness={metalness ?? (glow ? .15 : wet ? .10 : .04)} emissive={emissive ?? (glow ? color : '#000000')} emissiveIntensity={emissiveIntensity ?? (glow ? (night ? 1.8 : .08) : 0)} />
   </instancedMesh>
@@ -438,6 +439,16 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
   </>
 }
 
+function ThemeSignatureOverlay({ theme, night }: { theme: ThemeName; night: boolean }) {
+  const signature = useMemo(() => buildThemeSignature(theme), [theme])
+  const bodies = useMemo(() => [...signature.bodies, ...signature.attachments], [signature])
+  const spec = themeSpecs[theme]
+  return <>
+    <Boxes items={bodies} roughness={.78} metalness={.04} castShadow={false} receiveShadow={false} />
+    {night && <Boxes items={signature.accents} color="#ffffff" glow night emissive={spec.emission} emissiveIntensity={.18} castShadow={false} receiveShadow={false} />}
+  </>
+}
+
 function Transport({ night, count }: { night: boolean; count: number }) {
   const train = useRef<Group>(null)
   const traffic = useRef<InstancedMesh>(null)
@@ -556,6 +567,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
     <Ground time={time} weather={weather} mode={mode} quality={quality} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
     <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={weather} quality={quality} />
+    {enabled && <ThemeSignatureOverlay theme={theme} night={night} />}
     {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
     {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure accent={enabled ? themeSpecs[theme].emission : '#b1a286'} theme={enabled ? theme : null} night={night} sunset={time === 'sunset'} time={time} quality={quality} /><Transport night={night} count={config.traffic} />

@@ -1,6 +1,6 @@
 # StableCity 项目事实与进度表
 
-更新时间：2026-10-18（Asia/Shanghai）
+更新时间：2026-10-19（Asia/Shanghai）
 
 本文件是项目当前状态的唯一入口。专题实现和验收细节保留在对应证据文档中；旧迁移记录仅作历史参考。
 
@@ -34,6 +34,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 | Stage 16 外围建筑轮廓 | 已完成工程实现与主代理日落/夜晚/雪夜实景复核 | `buildings` 保留为 Stage 15 逻辑基线；新增 `visibleBodies` 与 `upperMasses` 形成相接、无体积重叠的轮廓分段；屋顶及雪盖贴合实际最高体量；单一共享 Boxes 批次，LOW 保留；晴朗场景实测较 Stage 15 增加 1 draw / 1,296 triangles | 用户审美评价仍待复核；当前 FPS 接近刷新上限，不能据此推导 GPU 成本 |
 | Stage 17 外围立面节奏 | 已完成工程实现与主代理日落/夜晚/Theme OFF 实景复核 | 派生 garden / neighborhood / tower 三类立面节奏；新增共享 facadePanels 批次，636 个实例 / 7,632 triangles，内嵌到可见主体和塔楼上层；区分主体 intrinsic lightness；LOW 与 Theme OFF 均保留；实测较 Stage 16 增加 1 draw / 7,632 triangles，浏览器无 error | 用户最终审美评价仍待完成；当前 FPS 接近刷新上限，不能据此推导 GPU 成本 |
 | Stage 18 公共空间地标系统 | 已完成工程实现与主代理白昼/夜晚/雪天实景复核 | 滨水叠檐亭与深公园南向开口 U 形棚架作为确定性派生几何；共享一个 Boxes 批次，LOW 保留；8 段低权重暖光仅在夜景实例化；雪盖只覆盖亭顶与平台；公园树在渲染派生时避让地标 footprint；原 buildings、河道、桥、相机、巨构和随机序列保持不变。白昼 LOW 为 59.99 FPS / 16.67 ms / 58 draws / 83,844 tris；夜晚 LOW 为 58.62 FPS / 17.06 ms / 59 draws / 83,940 tris；浏览器无 error | 用户最终审美评价仍待完成；当前 FPS 接近刷新上限，不能据此推导 GPU 成本 |
+| Stage 19 Theme Signature Assets | 已完成工程实现与主代理 Overview/Mega 实景复核 | 保留三主题低位公共空间 signature，并在 Megastructure 两侧安全区追加可逆 Hero attachments：Harbor 双侧开放门框、Verdant 双侧三级水平翼棚、Ember 双侧向外递高三齿风帽；Theme OFF 返回空资产且不挂载 Overlay；实体共享一个无阴影 Boxes 批次，夜间强调共享一个低发光批次；LOW 保留完整资产；不修改 Megastructure Core、Metropolis/StableCity、道路、河桥或相机。Theme OFF 白昼 LOW 基线为 58 draws / 83,844 tris；Harbor、Verdant、Ember 白昼均为 59 draws，分别为 84,180 / 84,084 / 84,228 tris；Ember 夜雨 Overview LOW 为 63 draws / 85,700 tris，Mega 为 55 draws / 81,956 tris；全新浏览器无 error | 用户最终审美评价仍待完成；约 60 FPS 接近刷新上限，不能据此推导 GPU 成本 |
 | 自动浏览器回归 | 阻断 | 现有源码、构建和人工浏览器验收可继续 | 引入 Playwright 等新依赖前需 ChangeRequest |
 | 外部 AI/API | 延后 | Provider 状态与成本均如实显示为未接入、$0 | API 凭据、预算与批准流程确认后再做 |
 
@@ -58,7 +59,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 1. 收集用户对 Stage 10 材质响应和外围降权的视觉反馈，不再继续盲目微调参数。
 2. 请用户直接观看 Stage 16/17 的 Harbor Overview 白昼、日落、夜晚、雪天与 LOW；根据轮廓和立面节奏辨识度、实际 draw-call 变化决定是否接受本阶段。
-3. 下一独立视觉里程碑应处理三个 Theme 的 Signature Asset 差异化；只改变允许的主题附加层，不改 StableCity、城市结构或 Megastructure Core。
+3. 请用户直接观看 Stage 19 的 Harbor / Verdant / Ember Overview 白昼 LOW 与 Ember 夜雨；判断 Hero 附件是否形成足够明确且不过度的主题差异。
 4. 完成真实移动 GPU、多设备与长时间闪烁录屏验收；当前本机 60 FPS 样本不能替代这些证据。
 5. 若要接入真实 Provider / Image / 3D API，先确认服务、密钥管理、预算和批准门。
 6. 自动浏览器回归需要新增依赖的 ChangeRequest；真实 SSR、物理水体、体积云/云影、真实大气散射和景深继续延后。
