@@ -5,12 +5,13 @@ import { clearProductionDraft, loadProductionDraft, saveProductionDraft, type St
 
 type Task = StoredTask
 const statusLabels = { queued: '待运行', review: '待审核', approved: '已批准', rejected: '已退回' }
-const strategyLabels: Record<RequestedStrategy, string> = { auto: '自动路由', 'direct-api': '直连 API', codex: 'Codex 工程执行', hybrid: '混合流程' }
+const strategyLabels: Record<RequestedStrategy, string> = { auto: '自动选择', 'direct-api': '直连 API', codex: 'Codex 工程执行', hybrid: '混合流程' }
+function nextRunEventId(events: RunEvent[]) { return (events.at(-1)?.id ?? 0) + 1 }
 const strategyOptions: { value: RequestedStrategy; title: string; status: string; detail: string }[] = [
-  { value: 'auto', title: 'Auto · 自动路由', status: '本地可用', detail: '请求本地模板处理任务。' },
-  { value: 'codex', title: 'Codex · 工程执行', status: '未连接', detail: 'Codex 工程执行当前不可用。' },
-  { value: 'direct-api', title: 'Direct API · 3D API 模型生成', status: '未配置', detail: '3D API 尚未配置。' },
-  { value: 'hybrid', title: 'Hybrid · 混合流程', status: '未接入', detail: '混合流程尚未接入。' },
+  { value: 'auto', title: 'Auto · 自动选择', status: '当前唯一可用：本地规则模板（非 AI）', detail: '使用本地规则模板处理任务。' },
+  { value: 'codex', title: 'Codex · 工程执行', status: '未接入', detail: '下一步：需要连接 Codex 执行服务。' },
+  { value: 'direct-api', title: 'Direct API · 3D API 模型生成', status: '未接入', detail: '下一步：需要配置 Provider 与安全凭据。API Key 不在当前页面输入，需未来 Provider 设置。' },
+  { value: 'hybrid', title: 'Hybrid · 混合流程', status: '未接入', detail: '下一步：需先接入 Codex 与 3D Provider。' },
 ]
 const capabilityLabels: Record<Capability, string> = { facade: '立面', transport: '交通', atmosphere: '氛围' }
 type RunEvent = { id: number; label: string }
@@ -33,7 +34,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   }, [brief, events, requestedStrategy, tasks, themeCandidate, themeCandidateStatus])
 
   function logEvent(label: string) {
-    setEvents(prev => [...prev, { id: prev.length + 1, label }].slice(-8))
+    setEvents(prev => [...prev, { id: nextRunEventId(prev), label }].slice(-8))
   }
 
   function splitBrief() {
@@ -104,7 +105,7 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   }
 
   function exportRunLog() {
-    const exportEvent = { id: events.length + 1, label: `export · ${tasks.length} tasks · local session` }
+    const exportEvent = { id: nextRunEventId(events), label: `export · ${tasks.length} tasks · local session` }
     const exportEvents = [...events, exportEvent].slice(-8)
     setEvents(exportEvents)
     const payload = { exportedAt: new Date().toISOString(), seed, theme, themeVersion: themeCandidate ? `${themeCandidate}-local-01` : null, requestedStrategy, tasks, events: exportEvents }
@@ -132,10 +133,10 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       <div className="strategy-options">
         {strategyOptions.map(option => <label key={option.value} className={`strategy-card ${requestedStrategy === option.value ? 'selected' : ''}`}>
           <input type="radio" name="requested-strategy" value={option.value} checked={requestedStrategy === option.value} onChange={() => { setRequestedStrategy(option.value); logEvent(`strategy.select · ${option.value}`) }} />
-          <span className="strategy-card-content"><strong>{option.title}</strong><b>{option.status}</b><small>{option.detail}实际执行仍为 local-template（本地模板）。</small></span>
+          <span className="strategy-card-content"><strong>{option.title}</strong><b>{option.status}</b><small>{option.detail}</small></span>
         </label>)}
       </div>
-      <p className="strategy-current" role="status">已选请求：{strategyLabels[requestedStrategy]} · 实际执行：local-template（本地模板）；不会发送外部请求。切换只影响之后新入队任务。</p>
+      <p className="strategy-current" role="status">当前真实执行源：本地规则模板（非 AI）· 无模型调用 · $0。已选请求：{strategyLabels[requestedStrategy]}；实际执行仍为 local-template（本地规则模板，非 AI），不会发送外部请求。切换只影响之后新入队任务。</p>
     </fieldset>
     <label className="brief-label" htmlFor="production-brief">制作要求</label>
     <textarea id="production-brief" value={brief} onChange={e => setBrief(e.target.value)} maxLength={1200} rows={3} />
@@ -157,6 +158,6 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
       {task.status === 'rejected' && <button onClick={() => requeue(task.id)}>重新入队</button>}
     </article>)}</div>
     <div className="log-actions"><h3>Run Log · 运行记录</h3><div><button disabled={!events.length} onClick={exportRunLog}>导出 JSON</button><button onClick={resetProductionDraft}>清除本地草稿</button></div></div>
-    <div className="run-log" role="log" aria-live="polite">{events.length ? events.map(event => <span key={event.id}>{String(event.id).padStart(2, '0')} · {event.label}</span>) : <span>尚无运行事件。</span>}</div>
+    <div className="run-log" role="log" aria-live="polite">{events.length ? events.map((event, index) => <span key={`${event.id}-${index}`}>{String(event.id).padStart(2, '0')} · {event.label}</span>) : <span>尚无运行事件。</span>}</div>
   </>
 }
