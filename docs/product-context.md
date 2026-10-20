@@ -1,6 +1,6 @@
 # StableCity 项目事实与进度表
 
-更新时间：2026-10-19（Asia/Shanghai）
+更新时间：2026-10-20（Asia/Shanghai）
 
 本文件是项目当前状态的唯一入口。专题实现和验收细节保留在对应证据文档中；旧迁移记录仅作历史参考。
 
@@ -35,6 +35,7 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 | Stage 17 外围立面节奏 | 已完成工程实现与主代理日落/夜晚/Theme OFF 实景复核 | 派生 garden / neighborhood / tower 三类立面节奏；新增共享 facadePanels 批次，636 个实例 / 7,632 triangles，内嵌到可见主体和塔楼上层；区分主体 intrinsic lightness；LOW 与 Theme OFF 均保留；实测较 Stage 16 增加 1 draw / 7,632 triangles，浏览器无 error | 用户最终审美评价仍待完成；当前 FPS 接近刷新上限，不能据此推导 GPU 成本 |
 | Stage 18 公共空间地标系统 | 已完成工程实现与主代理白昼/夜晚/雪天实景复核 | 滨水叠檐亭与深公园南向开口 U 形棚架作为确定性派生几何；共享一个 Boxes 批次，LOW 保留；8 段低权重暖光仅在夜景实例化；雪盖只覆盖亭顶与平台；公园树在渲染派生时避让地标 footprint；原 buildings、河道、桥、相机、巨构和随机序列保持不变。白昼 LOW 为 59.99 FPS / 16.67 ms / 58 draws / 83,844 tris；夜晚 LOW 为 58.62 FPS / 17.06 ms / 59 draws / 83,940 tris；浏览器无 error | 用户最终审美评价仍待完成；当前 FPS 接近刷新上限，不能据此推导 GPU 成本 |
 | Stage 19 Theme Signature Assets | 已完成工程实现与主代理 Overview/Mega 实景复核 | 保留三主题低位公共空间 signature，并在 Megastructure 两侧安全区追加可逆 Hero attachments：Harbor 双侧开放门框、Verdant 双侧三级水平翼棚、Ember 双侧向外递高三齿风帽；Theme OFF 返回空资产且不挂载 Overlay；实体共享一个无阴影 Boxes 批次，夜间强调共享一个低发光批次；LOW 保留完整资产；不修改 Megastructure Core、Metropolis/StableCity、道路、河桥或相机。Theme OFF 白昼 LOW 基线为 58 draws / 83,844 tris；Harbor、Verdant、Ember 白昼均为 59 draws，分别为 84,180 / 84,084 / 84,228 tris；Ember 夜雨 Overview LOW 为 63 draws / 85,700 tris，Mega 为 55 draws / 81,956 tris；全新浏览器无 error | 用户最终审美评价仍待完成；约 60 FPS 接近刷新上限，不能据此推导 GPU 成本 |
+| Production Console 执行通道入口 | 已完成信息架构优化与主代理浏览器验收 | Pipeline 标题后常显四张原生单选通道卡：Auto、本地不可用的 Codex、未配置的 3D API、未接入的 Hybrid；每张卡和汇总状态均区分“请求意图”与实际 `local-template`，声明不会发送外部请求；选择只影响后续入队任务并随浏览器草稿恢复；完整面板保持常驻挂载，移除隐藏式 Run controls 外壳。`pnpm validate`、都市/天气/主题专项校验和 `git diff --check` 全部通过；浏览器确认 Codex 选择刷新后仍保留且 console error 为 0 | 真实 Codex、3D API 与 Hybrid 执行尚未接入，状态不得改为可用 |
 | 自动浏览器回归 | 阻断 | 现有源码、构建和人工浏览器验收可继续 | 引入 Playwright 等新依赖前需 ChangeRequest |
 | 外部 AI/API | 延后 | Provider 状态与成本均如实显示为未接入、$0 | API 凭据、预算与批准流程确认后再做 |
 

@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { interpretThemeBrief, themeSpecs, type ThemeName } from './theme'
 import { routeCapability, type Capability, type RequestedStrategy } from './router'
 import { clearProductionDraft, loadProductionDraft, saveProductionDraft, type StoredTask } from './runPersistence'
-import { getProvider } from './provider'
 
 type Task = StoredTask
 const statusLabels = { queued: '待运行', review: '待审核', approved: '已批准', rejected: '已退回' }
 const strategyLabels: Record<RequestedStrategy, string> = { auto: '自动路由', 'direct-api': '直连 API', codex: 'Codex 工程执行', hybrid: '混合流程' }
+const strategyOptions: { value: RequestedStrategy; title: string; status: string; detail: string }[] = [
+  { value: 'auto', title: 'Auto · 自动路由', status: '本地可用', detail: '请求本地模板处理任务。' },
+  { value: 'codex', title: 'Codex · 工程执行', status: '未连接', detail: 'Codex 工程执行当前不可用。' },
+  { value: 'direct-api', title: 'Direct API · 3D API 模型生成', status: '未配置', detail: '3D API 尚未配置。' },
+  { value: 'hybrid', title: 'Hybrid · 混合流程', status: '未接入', detail: '混合流程尚未接入。' },
+]
 const capabilityLabels: Record<Capability, string> = { facade: '立面', transport: '交通', atmosphere: '氛围' }
 type RunEvent = { id: number; label: string }
 
@@ -21,7 +26,6 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
   const [themeCandidateStatus, setThemeCandidateStatus] = useState<'preview' | 'confirmed' | 'rejected' | null>(() => persisted?.themeCandidateStatus ?? null)
   const interpretedTheme = interpretThemeBrief(brief)
   const interpretedSpec = themeSpecs[interpretedTheme]
-  const localProvider = getProvider('none')
   const statusCounts = tasks.reduce<Record<Task['status'], number>>((counts, task) => { counts[task.status] += 1; return counts }, { queued: 0, review: 0, approved: 0, rejected: 0 })
 
   useEffect(() => {
@@ -122,13 +126,21 @@ export function ProductionPanel({ seed, theme }: { seed: number; theme: string }
 
   return <>
     <h3>拆分制作任务</h3>
-    <p className="help">本地模板演练：拆分 → 生成说明 → 人工审核。结果不会自动修改城市，刷新后清空。</p>
+    <p className="help">本地模板演练：拆分 → 生成说明 → 人工审核。任务与设置保存在浏览器本地草稿中，结果不会自动修改城市。</p>
+    <fieldset className="strategy-select">
+      <legend>执行通道 · REQUESTED STRATEGY</legend>
+      <div className="strategy-options">
+        {strategyOptions.map(option => <label key={option.value} className={`strategy-card ${requestedStrategy === option.value ? 'selected' : ''}`}>
+          <input type="radio" name="requested-strategy" value={option.value} checked={requestedStrategy === option.value} onChange={() => { setRequestedStrategy(option.value); logEvent(`strategy.select · ${option.value}`) }} />
+          <span className="strategy-card-content"><strong>{option.title}</strong><b>{option.status}</b><small>{option.detail}实际执行仍为 local-template（本地模板）。</small></span>
+        </label>)}
+      </div>
+      <p className="strategy-current" role="status">已选请求：{strategyLabels[requestedStrategy]} · 实际执行：local-template（本地模板）；不会发送外部请求。切换只影响之后新入队任务。</p>
+    </fieldset>
     <label className="brief-label" htmlFor="production-brief">制作要求</label>
     <textarea id="production-brief" value={brief} onChange={e => setBrief(e.target.value)} maxLength={1200} rows={3} />
     <div className="theme-interpreter"><span>Theme Interpreter · 主题识别（本地）</span><strong>{interpretedSpec.label}</strong><small>允许覆盖 {interpretedSpec.allowedSlots.length} 类；锁定 {interpretedSpec.blockedFields.length} 项城市结构。</small></div>
     {themeCandidate && <div className="theme-preview"><div><span>ThemeSpec Preview · 主题预览</span><strong>{themeSpecs[themeCandidate].label}</strong></div><small>版本 {themeCandidate}-local-01 · 不修改 StableCity</small><div className="theme-preview-grid"><span>允许：{themeSpecs[themeCandidate].allowedSlots.join(' · ')}</span><span>锁定：{themeSpecs[themeCandidate].blockedFields.join(' · ')}</span></div>{themeCandidateStatus === 'preview' && <div className="task-actions"><button className="primary" onClick={confirmThemeCandidate}>确认主题版本</button><button onClick={rejectThemeCandidate}>退回</button></div>}{themeCandidateStatus === 'confirmed' && <p className="result" role="status">已确认候选，等待后续生成策略。</p>}{themeCandidateStatus === 'rejected' && <p className="result" role="status">候选已退回。</p>}</div>}
-    <label className="strategy-select" htmlFor="requested-strategy"><span>请求策略 <small>选择计划，不会直接调用 API</small></span><select id="requested-strategy" value={requestedStrategy} onChange={e => { const next = e.target.value as RequestedStrategy; setRequestedStrategy(next); logEvent(`strategy.select · ${next}`) }}><option value="auto">Auto · 自动路由（推荐）</option><option value="direct-api">Direct API · 直连 API</option><option value="codex">Codex · 工程执行</option><option value="hybrid">Hybrid · 混合流程</option></select><small className="strategy-help">API 状态：未接入。当前所有任务实际走 local-template（本地模板），这里只记录请求意图，不会发送外部请求。</small></label>
-    <div className="provider-status" aria-label="Provider connection status"><div><span>当前执行源</span><strong>{localProvider.label}</strong></div><div><span>Provider 连接</span><strong className="offline">未接入</strong></div><small>{localProvider.note}；真实 API 配置将在后续 Provider 接入阶段开放。</small></div>
     <div className="task-actions">
       <button className="primary" disabled={!brief.trim()} onClick={splitBrief}>拆分并加入队列</button>
       <button disabled={!tasks.some(task => task.status === 'queued') || themeCandidateStatus !== 'confirmed'} onClick={runNext}>运行下一项</button>
