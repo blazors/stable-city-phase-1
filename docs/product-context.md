@@ -75,6 +75,12 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 ## 专题证据
 
+### Natural language Mood V1（2026-10-20）
+
+- 已加入版本化 `MoodSpec` / `ResolvedMood` 与 `source=local-rule` 本地规则解析器；规则可组合时段、降水、冷暖/红雾/白雾、湿润、雾、巨构灯光和镜头响应，输入案例仅作提示。
+- 总览页提供多行自然语言输入、生成与恢复入口；旧时段/天气控件降入高级调整，镜头与质量继续保留。`activeMood`、`prompt`、`source`、`version` 随 UI 草稿持久化，并兼容旧草稿迁移。
+- 仅完成代码级与构建验证；未声称视觉验收通过。真实浏览器、多设备性能和协同氛围的最终视觉验收仍由主代理执行。
+
 - 滨水反射与夜间层次：Water 继续使用单个 20,000×20,000 水面 plane；五个 `riverReflectionSources` 由 TypeScript 展开为固定 GLSL 锚点，暖/冷反射色分别为 #d6a66e 与 #58798c。反射仅作用于河道，日/日落/夜采用 .12/.42/1 强度，雨/雾衰减，雪与河道冰面关闭新增动态反射；现有整岸暖碎光已降低以免叠加。无新增 mesh、pass、API 或依赖。源码测试约束固定锚点、颜色、日夜/天气门控和单水面 plane。2026-10-18 在内置浏览器 Harbor / Overview / Night / Clear / LOW 实测：60.01 FPS、16.66 ms、57 draws、84,076 triangles、Canvas 首帧 121 ms；与上一里程碑对象统计相同。夜景河面保持暗面、反射锚点可辨且未压过 Hero；Snow 状态已确认加载且源码门控关闭新增动态反射。
 - 宏观构图：`docs/macro-composition-validation.md`
 - 天气与镜头：`docs/weather-validation.md`

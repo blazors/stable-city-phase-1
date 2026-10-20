@@ -16,6 +16,7 @@ import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from 
 import { createMegaRoofRibs, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
+import { applyMoodPalette, type ResolvedMood } from './mood'
 
 const city = createStableCity()
 const metropolis = generateMetropolis(city.seed)
@@ -143,9 +144,9 @@ function tintSeededItems(items: Box[], target: string, fallback: string): Box[] 
   })
 }
 
-function MegaPracticalHalo({ accent, time, quality }: { accent: string; time: TimeOfDay; quality: QualityPreset }) {
+function MegaPracticalHalo({ accent, time, quality, intensity = 1 }: { accent: string; time: TimeOfDay; quality: QualityPreset; intensity?: number }) {
   const ref = useRef<InstancedMesh>(null)
-  const uniforms = useMemo(() => ({ uColor: { value: new Color(accent) }, uOpacity: { value: time === 'night' ? .24 : .065 } }), [accent, time])
+  const uniforms = useMemo(() => ({ uColor: { value: new Color(accent) }, uOpacity: { value: (time === 'night' ? .24 : .065) * intensity } }), [accent, intensity, time])
   useLayoutEffect(() => {
     if (!ref.current) return
     const object = new Object3D()
@@ -167,7 +168,7 @@ function MegaPracticalHalo({ accent, time, quality }: { accent: string; time: Ti
   </instancedMesh>
 }
 
-function Megastructure({ accent, theme, night, sunset, quality, time }: { accent: string; theme: ThemeName | null; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay }) {
+function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { accent: string; theme: ThemeName | null; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay; mood?: ResolvedMood }) {
   const rotor = useRef<Group>(null)
   useFrame((_, delta) => { if (rotor.current) rotor.current.rotation.y += delta * .13 })
   const ribs = useMemo(() => {
@@ -198,8 +199,8 @@ function Megastructure({ accent, theme, night, sunset, quality, time }: { accent
     ]} />
     <mesh position={[-14, 17, 9]} rotation-z={-.18} castShadow receiveShadow><boxGeometry args={[17, 3, 7]} /><meshStandardMaterial color={spec?.megaBody ?? '#607b7a'} roughness={.7} /></mesh>
     <Boxes color={spec?.trim ?? '#b8bca9'} items={[{ position: [-21, 9, 9], size: [1, 15, 1] }, { position: [-14, 18.5, 9], size: [16, .18, 6] }]} />
-    {night && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28} distance={16} decay={2} />)}
-    <MegaPracticalHalo accent={accent} time={sunset ? 'sunset' : time} quality={quality} />
+    {(night || (mood?.lightLevel ?? 0) > .65) && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28 * (.35 + (mood?.lightLevel ?? .65))} distance={16} decay={2} />)}
+    <MegaPracticalHalo accent={accent} time={sunset ? 'sunset' : time} quality={quality} intensity={.5 + (mood?.lightLevel ?? .55)} />
     <group position={[0, 27.8, 9]} ref={rotor}>
       <mesh rotation-x={Math.PI / 2} castShadow><torusGeometry args={[2.7, .17, 8, 40]} /><meshStandardMaterial color={accent} roughness={.5} metalness={.4} /></mesh>
       <Boxes color={accent} items={[{ position: [0, 0, 0], size: [5.5, .18, .18] }, { position: [0, 0, 0], size: [.18, .18, 5.5] }]} />
@@ -207,16 +208,16 @@ function Megastructure({ accent, theme, night, sunset, quality, time }: { accent
   </>
 }
 
-function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset }) {
+function Water({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset; mood: ResolvedMood | null }) {
   const overviewOffset = mode === 'overview' ? overviewDistanceOffset() : 0
   const reflectionWeights = [.38, .68, .28, .52, .32] as const
   const reflectionAnchors = riverReflectionSources.map((x, index) => `reflection+=anchorReflection(world,${x.toFixed(1)},${reflectionWeights[index].toFixed(2)});`).join('\n')
   const material = useRef<ShaderMaterial>(null)
   const elapsed = useRef(0), motion = useRef(true)
   const uniforms = useMemo(() => {
-    const p = environmentPalette(time, weather)
-      return { uTime: { value: 0 }, uColor: { value: new Color(p.water) }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uReflectionTier: { value: time === 'night' ? 1 : time === 'sunset' ? .42 : .12 }, uReflectionWeather: { value: weather === 'snow' ? 0 : weather === 'rain' ? .42 : weather === 'haze' ? .55 : 1 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .22 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
-  }, [time, weather, mode, quality, overviewOffset])
+    const p = applyMoodPalette(environmentPalette(time, weather), mood); const water = new Color(p.water); water.multiplyScalar(.82 + (mood?.wetnessLevel ?? 0) * .18)
+      return { uTime: { value: 0 }, uColor: { value: water }, uHaze: { value: new Color(p.horizon) }, uNight: { value: time === 'night' ? 1 : 0 }, uReflectionTier: { value: time === 'night' ? 1 : time === 'sunset' ? .42 : .12 }, uReflectionWeather: { value: weather === 'snow' ? 0 : weather === 'rain' ? .42 : weather === 'haze' ? .55 : 1 }, uSun: { value: sunDirection(time) }, uSunColor: { value: new Color(p.sun) }, uRain: { value: weather === 'rain' ? 1 : 0 }, uIce: { value: weather === 'snow' ? 1 : 0 }, uReflection: { value: weather === 'snow' ? .15 : weather === 'rain' ? .22 : weather === 'haze' ? .25 : .7 }, uWaveLayers: { value: waterWaveBudgets[quality] }, uHeightFogColor: { value: new Color(sceneFog(time, weather, p.haze, overviewOffset).color) }, uHeightFogDensity: { value: (mood?.fogLevel ?? 0) > .2 ? heightFogDensity(mode) * (mood?.fogLevel ?? 0) / .62 : weather === 'haze' ? heightFogDensity(mode) : 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] }, uHeightFogTime: { value: 0 } }
+  }, [time, weather, mode, quality, overviewOffset, mood])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => { motion.current = !preference.matches }
@@ -316,7 +317,7 @@ function Water({ time, weather, mode, quality }: { time: TimeOfDay; weather: Wea
   </mesh>
 }
 
-function Ground({ time, weather, mode, quality }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset }) {
+function Ground({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset; mood?: ResolvedMood }) {
   const night = time === 'night'
   const details = useMemo(() => {
     const paving: Box[] = [], road: Box[] = [], markings: Box[] = [], lamps: Box[] = [], supports: Box[] = []
@@ -343,12 +344,12 @@ function Ground({ time, weather, mode, quality }: { time: TimeOfDay; weather: We
   }, [])
   const roads = useMemo(() => [...details.road, ...metropolis.roads], [details])
   return <>
-    <Water time={time} weather={weather} mode={mode} quality={quality} />
+    <Water time={time} weather={weather} mode={mode} quality={quality} mood={mood ?? null} />
     {/* Keep the structural slab below the paving surface to avoid coplanar depth fighting. */}
     <Boxes color="#4e6668" items={[{ position: [0, -1.2, 0], size: [83, 2.3, 83] }]} />
     <Boxes color="#788a83" items={[{ position: [0, -.12, 0], size: [81, .24, 81] }, ...details.paving]} />
-    <Boxes color={weather === 'rain' ? '#2e424b' : '#3e5359'} items={details.road} wet={weather === 'rain'} />
-    {weather === 'rain' && <RainPuddles night={night} quality={quality} roads={roads} />}
+    <Boxes color={(mood?.wetnessLevel ?? 0) > .35 || weather === 'rain' ? '#2e424b' : '#3e5359'} items={details.road} wet={(mood?.wetnessLevel ?? 0) > .35 || weather === 'rain'} />
+    {((mood?.wetnessLevel ?? 0) > .5 || weather === 'rain') && <RainPuddles night={night} quality={quality} roads={roads} />}
     <Boxes color="#abb9ac" items={details.markings} />
     <Boxes color="#738c87" items={details.supports} />
     <Boxes color="#f2c17e" items={details.lamps} glow night={night} />
@@ -532,19 +533,22 @@ function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', benchmark = false, onUpdate, onReady, onError }: {
+export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', benchmark = false, mood: moodProp, onUpdate, onReady, onError }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
+  mood?: ResolvedMood
   benchmark?: boolean
   onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
 }) {
   benchmark = benchmark || new URLSearchParams(window.location.search).get('view') === 'quality'
   const startedAt = useRef(performance.now())
-  const p = environmentPalette(time, weather), night = time === 'night', config = qualityConfig[quality]
+  const mood = moodProp
+  const effectiveWeather = mood && mood.wetnessLevel > .72 && weather === 'clear' ? 'rain' : weather
+  const p = applyMoodPalette(environmentPalette(time, effectiveWeather), mood), night = time === 'night', config = qualityConfig[quality]
   const lightPosition = sunDirection(time).multiplyScalar(120)
-  const lighting = timeLighting[time], weatherLight = weatherLighting[weather]
-  const fog = sceneFog(time, weather, p.haze, mode === 'overview' ? overviewDistanceOffset() : 0)
+  const lighting = timeLighting[time], weatherLight = weatherLighting[effectiveWeather]
+  const fog = sceneFog(time, effectiveWeather, p.haze, mode === 'overview' ? overviewDistanceOffset() : 0)
   const sceneCamera = useMemo(() => createSceneCamera(mode), [mode])
   return <Canvas
     camera={sceneCamera}
@@ -560,21 +564,21 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />
-    <Atmosphere time={time} weather={weather} lowDetail={quality === 'low'} quality={quality} />
+    <Atmosphere time={time} weather={effectiveWeather} lowDetail={quality === 'low'} quality={quality} mood={mood} />
     <CameraDirector mode={mode} />
-    <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill]} />
-    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill} />
-    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
-    <Ground time={time} weather={weather} mode={mode} quality={quality} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
-    <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={weather} quality={quality} />
+    <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)]} />
+    <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)} />
+    <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct * (.72 + (mood?.lightLevel ?? .55) * .28)} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-65} shadow-camera-right={65} shadow-camera-top={65} shadow-camera-bottom={-65} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
+    <Ground time={time} weather={effectiveWeather} mode={mode} quality={quality} mood={mood} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
+    <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={effectiveWeather} quality={quality} />
     {enabled && <ThemeSignatureOverlay theme={theme} night={night} />}
-    {weather === 'rain' && <Rain count={rainBudgets[quality]} night={night} />}
-    {weather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
-    <Megastructure accent={enabled ? themeSpecs[theme].emission : '#b1a286'} theme={enabled ? theme : null} night={night} sunset={time === 'sunset'} time={time} quality={quality} /><Transport night={night} count={config.traffic} />
+    {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
+    {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
+    <Megastructure accent={enabled ? themeSpecs[theme].emission : '#b1a286'} theme={enabled ? theme : null} night={night} sunset={time === 'sunset'} time={time} quality={quality} mood={mood} /><Transport night={night} count={config.traffic} />
     <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
-    <LensWeather time={time} weather={weather} quality={quality} mode={mode} />
-    {weather === 'haze' && <HeightFog color={fog.color} mode={mode} quality={quality} />}
+    <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
+    {(effectiveWeather === 'haze' || (mood?.fogLevel ?? 0) > .2) && <HeightFog color={fog.color} mode={mode} quality={quality} densityScale={Math.max(.2, (mood?.fogLevel ?? .62) / .62)} />}
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }

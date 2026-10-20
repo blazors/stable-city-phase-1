@@ -4,18 +4,18 @@ import { Color, Mesh, MeshStandardMaterial } from 'three'
 import type { QualityPreset } from './CityScene'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 
-export function HeightFog({ color, mode, quality }: { color: string; mode: 'overview' | 'mega'; quality: QualityPreset }) {
+export function HeightFog({ color, mode, quality, densityScale = 1 }: { color: string; mode: 'overview' | 'mega'; quality: QualityPreset; densityScale?: number }) {
   const { scene } = useThree()
   const motion = useRef(true), elapsed = useRef(0)
   const uniforms = useMemo(() => ({
-    uHeightFogColor: { value: new Color(color) }, uHeightFogDensity: { value: heightFogDensity(mode) },
+    uHeightFogColor: { value: new Color(color) }, uHeightFogDensity: { value: heightFogDensity(mode) * densityScale },
     uHeightFogTime: { value: 0 }, uHeightFogDetail: { value: heightFogBudgets[quality] },
   }), [])
   useLayoutEffect(() => {
     uniforms.uHeightFogColor.value.set(color)
-    uniforms.uHeightFogDensity.value = heightFogDensity(mode)
+    uniforms.uHeightFogDensity.value = heightFogDensity(mode) * densityScale
     uniforms.uHeightFogDetail.value = heightFogBudgets[quality]
-  }, [color, mode, quality, uniforms])
+  }, [color, densityScale, mode, quality, uniforms])
   useLayoutEffect(() => {
     const materials = new Set<MeshStandardMaterial>()
     scene.traverse(object => {

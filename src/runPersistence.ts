@@ -4,6 +4,7 @@ import type { ThemeName } from './theme'
 import type { Weather } from './Atmosphere'
 import type { RequestedStrategy, Capability } from './router'
 import { migrateWeatherDraft, weatherSchemaVersion } from './weather'
+import type { ResolvedMood } from './mood'
 
 const UI_KEY = 'stable-city:ui-draft:v1'
 const PRODUCTION_KEY = 'stable-city:production-draft:v1'
@@ -17,6 +18,7 @@ export type UiDraft = {
   weatherVersion?: number
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey
   decisions?: StoredDecision[]; checked?: string[]; qcResult?: boolean | null; qcIssues?: string[]; themeOffResult?: boolean | null; themeMatrixResult?: ThemeMatrixResult | null
+  activeMood?: ResolvedMood; prompt?: string; source?: 'local-rule'; version?: number
 }
 export type StoredTask = { id: number; name: string; input: string; themeVersion: string; capability: Capability; requestedStrategy: RequestedStrategy; strategy: 'local-template'; provider: 'none'; fallbackReason: 'auto-local' | 'provider-unavailable'; output: string; status: 'queued' | 'review' | 'approved' | 'rejected' }
 export type ProductionDraft = { brief: string; tasks: StoredTask[]; events: Array<{ id: number; label: string }>; requestedStrategy: RequestedStrategy; themeCandidate: ThemeName | null; themeCandidateStatus: 'preview' | 'confirmed' | 'rejected' | null }

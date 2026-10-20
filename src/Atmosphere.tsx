@@ -5,6 +5,7 @@ import type { TimeOfDay } from './city'
 import { rainPalettes } from './rain'
 import { snowPalettes } from './snow'
 import type { Weather } from './weather'
+import { applyMoodPalette, type ResolvedMood } from './mood'
 export { weatherLabels, weatherDescriptions, type Weather } from './weather'
 
 
@@ -98,13 +99,13 @@ const fragmentShader = `
 
 type AtmosphereQuality = 'auto' | 'high' | 'balanced' | 'low'
 
-export function Atmosphere({ time, weather, lowDetail, quality = 'auto' }: { time: TimeOfDay; weather: Weather; lowDetail: boolean; quality?: AtmosphereQuality }) {
+export function Atmosphere({ time, weather, lowDetail, quality = 'auto', mood }: { time: TimeOfDay; weather: Weather; lowDetail: boolean; quality?: AtmosphereQuality; mood?: ResolvedMood }) {
   const mesh = useRef<Mesh>(null)
   const material = useRef<ShaderMaterial>(null)
   const motion = useRef(true)
   const elapsed = useRef(0)
   const uniforms = useMemo(() => {
-    const p = environmentPalette(time, weather)
+    const p = applyMoodPalette(environmentPalette(time, weather), mood)
     return {
       uZenith: { value: new Color(p.zenith) }, uHorizon: { value: new Color(p.horizon) },
       uSunColor: { value: new Color(p.sun) }, uCloud: { value: new Color(p.cloud) },
@@ -114,7 +115,7 @@ export function Atmosphere({ time, weather, lowDetail, quality = 'auto' }: { tim
       uRain: { value: weather === 'rain' || weather === 'snow' ? 1 : 0 },
       uHaze: { value: weather === 'snow' ? .65 : weather === 'rain' ? .55 : weather === 'haze' ? 1 : .12 }, uDetail: { value: quality === 'low' || lowDetail ? 0 : quality === 'balanced' ? 1 : 2 },
     }
-  }, [time, weather, lowDetail, quality])
+  }, [time, weather, lowDetail, mood, quality])
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => { motion.current = !preference.matches }

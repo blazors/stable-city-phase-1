@@ -415,3 +415,10 @@ summary { cursor: pointer; }
   .run-controls-host { margin-bottom: 18px; }
   .console-footer { line-height: 1.5; }
 }
+ .mood-console { margin: 0 0 18px; padding: 16px; border: 1px solid rgba(185,205,205,.18); background: rgba(21,32,38,.72); }
+ .mood-console label { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #c5d8d4; margin-bottom: 8px; }
+ .mood-console textarea { width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; color: #eef4ed; background: rgba(5,12,17,.72); border: 1px solid rgba(185,205,205,.24); padding: 10px; font: inherit; }
+ .mood-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+ .mood-actions small { color: #91aaa7; }
+ .mood-examples { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+ .mood-examples button { font-size: 11px; color: #b9cdca; background: transparent; border: 1px solid rgba(185,205,205,.2); padding: 5px 8px; text-align: left; }
