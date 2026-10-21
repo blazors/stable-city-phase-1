@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 const checks = [
+  ['P0 scene config centralizes authored cameras and mega dimensions', /export const sceneConfig = \{[\s\S]*overview: \{ position: \[-270, 155, -305\].*target: \[0, 28, 45\].*fov: 46[\s\S]*hero: \{ position: \[-65, 7, -205\].*target: \[0, 52, 9\].*fov: 40[\s\S]*width: 64, height: 96, depth: 18/, 'src/sceneConfig.ts'],
+  ['P0 camera keeps the legacy mega mode mapped to the authored Hero preset', /mega: cameraConfig\.hero[\s\S]*hero: cameraConfig\.hero/, 'src/camera.ts'],
+  ['P0 mega greybox exposes beams, inset and braces', /export const megaMajorBraces[\s\S]*export const megaDoorPillars[\s\S]*export const megaDoorBeam[\s\S]*export const megaDeepEntrance/, 'src/megaGeometry.ts'],
+  ['P0 clearance is rendering-only and deterministic', /deriveMegaHeroClearance[\s\S]*clearedBuildingIds[\s\S]*visibleBuildings/, 'src/megaGeometry.ts'],
+  ['P0 shadow camera covers the 96-unit hero without covering the whole city', /shadow-camera-left=\{-70\} shadow-camera-right=\{70\} shadow-camera-top=\{110\} shadow-camera-bottom=\{-25\}/, 'src/CityScene.tsx'],
   ['StableCity block contract', /city\.blocks\.length !== 16/, 'src/city.ts'],
   ['StableCity building contract', /city\.buildings\.length !== 60/, 'src/city.ts'],
   ['UrbanGrammar contract', /secondaryRoads !== 4 .*localStreets !== 16 .*publicVoids !== 2/s, 'src/city.ts'],
@@ -21,7 +26,7 @@ const checks = [
   ['Stage 19 mounts the complete signature overlay only when Theme is enabled', /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'src/CityScene.tsx'],
   ['Stage 19 signatures merge public-space and Hero attachments into one body batch plus night accents', /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'src/CityScene.tsx'],
   ['Stage 19 signatures remain independent of city generators and random streams', /export function buildThemeSignature\(theme: ThemeName \| null\)[\s\S]*?if \(!theme\) return \{ bodies: \[\], accents: \[\], attachments: \[\] \}/, 'src/themeSignature.ts'],
-  ['Stage 19 Hero attachments occupy only the bilateral exterior range', /const heroZ = 9[\s\S]*?for \(const side of \[-1, 1\]\)[\s\S]*?side \* 13\.5[\s\S]*?side \* 16\.2[\s\S]*?side \* 18\.1/, 'src/themeSignature.ts'],
+  ['P0 Hero attachments derive from the new mega anchor', /const heroAnchor = \{ y: megaConfig\.gate\.height, z: megaConfig\.frontZ \+ megaConfig\.dimensions\.depth \/ 2 \}[\s\S]*?for \(const side of \[-1, 1\]\)[\s\S]*?heroAnchor\.y[\s\S]*?heroAnchor\.z/, 'src/themeSignature.ts'],
   ['Stage 18 snow covers only explicit pavilion roof and platform surfaces', /snowCaps\(metropolis\.publicSpaceSnowSurfaces\)/, 'src/CityScene.tsx'],
   ['Night fill lifts city readability while preserving the day and sunset rig', /day: \{ hemisphere: 1\.55, fill: \.62 \},\s*sunset: \{ hemisphere: \.88, fill: \.35 \},\s*night: \{ hemisphere: \.84, fill: \.30 \}/, 'src/lighting.ts'],
   ['Local routing boundary', /strategy: 'local-template'.*provider: 'none'/s, 'src/router.ts'],
@@ -60,7 +65,7 @@ const checks = [
   ['Canvas metrics discard at least ten warmup frames and 500ms after resets', /warmupElapsed >= 500 && current\.warmupFrames >= 10[\s\S]*elapsed >= 1000 && current\.frames >= 30/, 'src/CityScene.tsx'],
   ['Plan enumerates all nine acceptance scenarios with URLs and non-executed evidence markers', /harbor-sunset.*harbor-baseline.*verdant-sunset.*ember-sunset.*harbor-day.*harbor-night.*ember-rain-low.*verdant-snow-balanced.*harbor-haze-mega/s, 'src/visualAcceptance.ts'],
   ['Canvas owns the preframed camera from its first mount', /sceneCamera = useMemo\(\(\) => createSceneCamera\(mode\), \[mode\]\).*<Canvas\s+camera=\{sceneCamera\}/s, 'src/CityScene.tsx'],
-  ['First canvas frame fits the actual viewport', /onCreated=\{\(\{ camera, size(?:, gl, scene)? \}\) => \{\s+camera\.position\.set\(\.\.\.cameraPosition\(mode, size\.width \/ size\.height\)\)/, 'src/CityScene.tsx'],
+  ['First canvas frame fits the actual viewport', /onCreated=\{\(\{ camera, size(?:, gl, scene)? \}\) => \{\s+(?:if \('aspect' in camera\) camera\.aspect = size\.width \/ Math\.max\(1, size\.height\)\s+)?camera\.position\.set\(\.\.\.cameraPosition\(mode, size\.width \/ size\.height\)\)/, 'src/CityScene.tsx'],
   ['Scene has no delayed default camera replacement', /^(?![\s\S]*<PerspectiveCamera\b)/, 'src/CityScene.tsx'],
   ['Visible practicals share light position and colour', /megaPracticalPositions\.map\(position => \(\{ position, size:.*megaPracticalPositions\.map\(position => <pointLight[^>]*position=\{position\} color=\{accent\}/s, 'src/CityScene.tsx'],
   ['Sun and key light share environment direction', /lightPosition = sunDirection\(time\).*<directionalLight position=\{lightPosition\}/s, 'src/CityScene.tsx'],

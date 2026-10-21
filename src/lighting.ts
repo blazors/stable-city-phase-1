@@ -21,4 +21,4 @@ export function sceneFog(time: TimeOfDay, weather: Weather, color: string, overv
   return { color, near: fogNear + offset, far: fogFar + offset }
 }
 // Visible strips and receiver lights share world-space positions.
-export const megaPracticalPositions: [number, number, number][] = [[-5.83, 11, 5.5], [5.83, 11, 5.5]]
+export const megaPracticalPositions: [number, number, number][] = [[-18, 42, .8], [18, 42, .8]]

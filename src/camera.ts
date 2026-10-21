@@ -1,24 +1,27 @@
 import { PerspectiveCamera } from 'three'
+import { cameraConfig, type Vec3 } from './sceneConfig'
 
-type Vec3 = [number, number, number]
+export type CameraMode = 'overview' | 'mega' | 'hero'
 
 export const cameraViews = {
-  overview: { position: [-270, 155, -305] as Vec3, target: [0, 8, 45] as Vec3, fov: 46 },
-  // A longer lens and stand-off reduce foreground enlargement while retaining street-scale context.
-  mega: { position: [-60, 36, -60] as Vec3, target: [-2, 15, 9] as Vec3, fov: 38 },
+  overview: cameraConfig.overview,
+  // `mega` is retained as the UI and persistence mode name; `hero` is the authored preset name.
+  mega: cameraConfig.hero,
+  hero: cameraConfig.hero,
 }
 export const overviewDistanceOffset = () => Math.max(0, Math.hypot(...cameraViews.overview.position.map((value, axis) => value - cameraViews.overview.target[axis])) - 420)
 
-export function cameraPosition(mode: keyof typeof cameraViews, aspect: number): Vec3 {
+export function cameraPosition(mode: CameraMode, aspect: number): Vec3 {
   const { position, target } = cameraViews[mode]
-  const portrait = mode === 'mega' ? Math.max(0, Math.min(1, (.9 - aspect) / .4)) : 0
-  const fit = Math.max(1, Math.min(mode === 'overview' ? 2.25 : 2.7, 1.35 / aspect)) * (1 - portrait * .22)
-  // Portrait Mega keeps the hero large and looks through the low central skyline valley.
-  const offset = [14, 3, -9]
-  return position.map((value, axis) => target[axis] + (value - target[axis] + offset[axis] * portrait) * fit) as Vec3
+  const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1
+  const fit = Math.max(1, Math.min(mode === 'overview' ? 2.25 : 2.7, (mode === 'overview' ? .9 : .64) / safeAspect))
+  const adapted = position.map((value, axis) => target[axis] + (value - target[axis]) * fit) as Vec3
+  // Keep the close-up camera above the ground when a narrow viewport needs a dolly-back.
+  if (mode !== 'overview') adapted[1] = Math.max(3, adapted[1])
+  return adapted
 }
 
-export function createSceneCamera(mode: keyof typeof cameraViews) {
+export function createSceneCamera(mode: CameraMode) {
   const view = cameraViews[mode]
   const camera = new PerspectiveCamera(view.fov, 1, .5, 2600)
   camera.position.set(...view.position)

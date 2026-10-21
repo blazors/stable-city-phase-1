@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "validate": "pnpm build && node scripts/validate-source.mjs && node scripts/validate-mood.mjs && node scripts/test-visual-acceptance.mjs && node scripts/validate-snapshot.mjs",
+    "validate": "pnpm build && node scripts/validate-source.mjs && node scripts/validate-metropolis.mjs && node scripts/validate-theme.mjs && node scripts/validate-mood.mjs && node scripts/test-visual-acceptance.mjs && node scripts/validate-snapshot.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -4,17 +4,22 @@ import ts from 'typescript'
 import { Color, Vector3 } from 'three'
 
 // Execute the actual generators without adding a test runner or emitting build files.
+const sceneConfigSource = fs.readFileSync(new URL('../src/sceneConfig.ts', import.meta.url), 'utf8')
+const sceneConfigOutput = ts.transpileModule(sceneConfigSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+const sceneConfigUrl = `data:text/javascript;base64,${Buffer.from(sceneConfigOutput).toString('base64')}`
 async function sourceModule(file) {
   const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } })
-  const resolved = outputText.replace(/from (['"])three\1/g, `from '${import.meta.resolve('three')}'`)
+  const resolved = outputText
+    .replace(/from (['"])three\1/g, `from '${import.meta.resolve('three')}'`)
+    .replace(/from (['"])\.\/sceneConfig\1/g, `from '${sceneConfigUrl}'`)
   return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`)
 }
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
 const { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset } = await sourceModule('../src/camera.ts')
 const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = await sourceModule('../src/lighting.ts')
-const { createMegaRoofRibs, megaRoofDeck, megaRoofFascia, megaRoofRibHeight, megaRoofRibY, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
+const { createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, megaHeroClearanceRegion, megaRoofDeck, megaRoofFascia, megaRoofRibHeight, megaRoofRibY, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
 const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
 const fasciaBounds = verticalBounds(megaRoofFascia), deckBounds = verticalBounds(megaRoofDeck)
 assert(fasciaBounds.bottom > megaRoofSupportTop, 'Mega roof fascia clears the support beam')
@@ -52,7 +57,12 @@ for (const mode of ['overview', 'mega']) {
   assert.deepEqual(initial.position.toArray(), position, `${mode}: first-frame position is ready before mount`)
   const expectedDirection = new Vector3(...target).sub(initial.position).normalize()
   assert(initial.getWorldDirection(new Vector3()).distanceTo(expectedDirection) < 1e-9, `${mode}: first-frame direction targets the subject`)
-  assert(initial.position.y > target[1] && initial.fov === fov, `${mode}: initial camera is above subject with authored lens`)
+  assert(initial.fov === fov, `${mode}: authored lens is applied`)
+  if (mode === 'mega') {
+    assert(initial.position.y >= 3 && initial.position.y <= 10, 'hero camera height stays in the low dolly band')
+    const elevation = Math.atan2(target[1] - initial.position.y, Math.hypot(initial.position.x - target[0], initial.position.z - target[2])) * 180 / Math.PI
+    assert(elevation >= 8 && elevation <= 15, 'hero camera keeps the authored 8-15 degree elevation')
+  } else assert(initial.position.y > target[1], `${mode}: overview remains above subject`)
   assert.deepEqual(cameraPosition(mode, 1.5), position, `${mode}: desktop camera preset`)
   assert(fov > 30 && fov < 60, `${mode}: moderate perspective`)
   for (const aspect of [.5, 1, 1.5, 2.5]) {
@@ -63,11 +73,7 @@ for (const mode of ['overview', 'mega']) {
     const distance = Math.hypot(...adapted.map((value, axis) => value - target[axis]))
     assert(distance < (mode === 'overview' ? 1700 : 800), `${mode}: orbit bounds retain adapted camera`)
     assert(distance < initial.far, `${mode}: adapted camera stays inside the far plane`)
-    if (mode !== 'mega' || aspect >= .9) {
-      for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: landscape viewport preserves viewing direction`)
-    } else {
-      assert(Math.abs((adapted[0] - target[0]) / (adapted[2] - target[2])) < Math.abs((position[0] - target[0]) / (position[2] - target[2])), 'portrait Mega turns toward the central skyline valley')
-    }
+    if (mode === 'overview' || aspect >= .9) for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: landscape viewport preserves viewing direction`)
   }
 }
 const overviewCamera = createSceneCamera('overview')
@@ -80,8 +86,19 @@ for (const [x, z] of [[-234, -126], [234, -126], [-234, 234], [234, 234]]) {
   const projected = new Vector3(x, 0, z).project(overviewCamera)
   assert(Math.abs(projected.x) < 1.25 && projected.y > -1.25 && projected.y < .9, `overview keeps the occupied metropolitan grid near the safe frame`)
 }
-const foregroundTower = createStableCity().buildings.find(building => building.id === '1:0-0')
-for (const aspect of [.5, 1.5]) {
+const heroCamera = createSceneCamera('mega')
+heroCamera.aspect = 1.5
+heroCamera.position.set(...cameraPosition('mega', 1.5))
+heroCamera.lookAt(...cameraViews.mega.target)
+heroCamera.updateProjectionMatrix()
+heroCamera.updateMatrixWorld()
+const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
+const gateShare = Math.abs(heroProject(0, 56, 0).y - heroProject(0, 0, 0).y)
+assert(gateShare >= .55 && gateShare <= .75, `hero gate occupies the 55-75% screen band (got ${gateShare.toFixed(3)})`)
+const coreHeights = createStableCity().buildings.filter(building => building.id.startsWith('1:') || building.id.startsWith('2:')).map(building => building.height).sort((a, b) => a - b)
+const coreMedian = coreHeights[Math.floor(coreHeights.length / 2)]
+assert(96 / coreMedian >= 4 && 96 / coreMedian <= 8, `mega scale ratio stays 4-8x core median (got ${(96 / coreMedian).toFixed(2)})`)
+for (const aspect of [.5, 1.5, 2.5]) {
   const camera = createSceneCamera('mega')
   camera.aspect = aspect
   camera.position.set(...cameraPosition('mega', aspect))
@@ -89,20 +106,26 @@ for (const aspect of [.5, 1.5]) {
   camera.updateProjectionMatrix()
   camera.updateMatrixWorld()
   const project = (x, y, z) => new Vector3(x, y, z).project(camera)
-  const top = project(foregroundTower.x, foregroundTower.height, foregroundTower.z)
-  const base = project(foregroundTower.x, 0, foregroundTower.z)
-  const heroTop = project(0, 29, 9), heroBase = project(0, 0, 9)
-  const heroHeight = heroTop.y - heroBase.y
-  assert((top.y - base.y) / heroHeight < 1.35, 'Mega foreground tower has bounded perspective enlargement')
-  assert(top.x < -.25 && top.x > -.9, 'Mega foreground tower stays a left-side scale reference')
-  assert(heroHeight > .3 && heroTop.y < .8 && heroBase.y > -.8, 'Mega hero retains readable scale with vertical breathing room')
-  if (aspect === .5) {
-    assert(heroHeight > .38, 'portrait Mega preserves hero size instead of over-retreating')
-    for (const x of [-13, 13]) for (const y of [0, 27]) {
-      assert(Math.abs(project(x, y, 9).x) < .85, 'portrait Mega gate stays inside horizontal safe frame')
-    }
+  for (const x of [-32, 32]) for (const y of [0, 96]) for (const z of [0, 18]) {
+    const projected = project(x, y, z)
+    assert(Math.abs(projected.x) < .98 && projected.y > -.98 && projected.y < .98, `${aspect}: mega bounds remain uncropped`)
   }
 }
+const structure = createMegaStructureGeometry()
+const allMegaBoxes = [...structure.bodies, ...structure.inset, ...structure.braces]
+const minX = Math.min(...allMegaBoxes.map(item => item.position[0] - item.size[0] / 2)), maxX = Math.max(...allMegaBoxes.map(item => item.position[0] + item.size[0] / 2))
+const minY = Math.min(...structure.bodies.map(item => item.position[1] - item.size[1] / 2)), maxY = Math.max(...structure.bodies.map(item => item.position[1] + item.size[1] / 2))
+assert.equal([minX, maxX, maxY - minY].join(','), '-32,32,96', 'mega greybox starts at 64 x 96 envelope')
+assert(structure.inset.some(item => item.position[2] > 0 && item.size[1] >= 56), 'mega gate includes a deep recessed entrance')
+assert(structure.braces.length >= 2 && structure.braces.every(item => item.rotation), 'mega gate has major diagonal braces')
+const cityForClearance = createStableCity(), signatureBefore = cityForClearance.signature
+const clearance = deriveMegaHeroClearance(cityForClearance), repeatClearance = deriveMegaHeroClearance(createStableCity())
+assert.deepEqual(clearance.clearedBuildingIds, repeatClearance.clearedBuildingIds, 'mega visible clearance is deterministic')
+assert.deepEqual(clearance.visibleBuildings.map(building => building.id), repeatClearance.visibleBuildings.map(building => building.id), 'visible building IDs remain deterministic')
+assert.equal(cityForClearance.signature, signatureBefore, 'clearance derivation does not mutate StableCity signature')
+assert(clearance.clearedBuildingIds.length > 0, '64-unit mega region derives a non-empty building clearance')
+assert.equal(clearance.region.maxX - clearance.region.minX, 64, 'clearance region preserves the 64-unit mega width')
+for (const building of clearance.visibleBuildings) assert(building.x + building.width / 2 <= clearance.envelope.minX || building.x - building.width / 2 >= clearance.envelope.maxX || building.z + building.depth / 2 <= clearance.envelope.minZ || building.z - building.depth / 2 >= clearance.envelope.maxZ, 'visible buildings stay outside the mega clearance envelope')
 const overlapsCore = ({ position: [x, , z], size: [w, , d] }) => Math.abs(x) - w / 2 < 41.5 && Math.abs(z) - d / 2 < 41.5
 const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].some(offset => {
   const px = x + offset * w

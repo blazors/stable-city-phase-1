@@ -2,14 +2,19 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import ts from 'typescript'
 
+const sceneConfigSource = fs.readFileSync(new URL('../src/sceneConfig.ts', import.meta.url), 'utf8')
+const sceneConfigOutput = ts.transpileModule(sceneConfigSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+const sceneConfigUrl = `data:text/javascript;base64,${Buffer.from(sceneConfigOutput).toString('base64')}`
 async function sourceModule(file) {
   const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } })
-  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
+  const resolved = outputText.replace(/from (['"])\.\/sceneConfig\1/g, `from '${sceneConfigUrl}'`)
+  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`)
 }
 
 const { themeSpecs } = await sourceModule('../src/theme.ts')
 const { buildThemeSignature } = await sourceModule('../src/themeSignature.ts')
+const { megaConfig } = await sourceModule('../src/sceneConfig.ts')
 const { timeLighting } = await sourceModule('../src/lighting.ts')
 const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
 const signatureSource = fs.readFileSync(new URL('../src/themeSignature.ts', import.meta.url), 'utf8')
@@ -49,14 +54,14 @@ for (const [index, theme] of themeNames.entries()) {
   assert.equal(signature.accents.filter(item => item.slot === 'hero').length, 2, `${theme} has two night-only Hero accents`)
   for (const attachment of heroAssets) {
     const [x, y, z] = attachment.position, [width, height, depth] = attachment.size
-    assert(Math.abs(x) - width / 2 >= 12, `${theme} attachment stays outside the protected central zone`)
-    assert(Math.abs(x) + width / 2 <= 20, `${theme} attachment stays inside the Hero x range`)
-    assert(z - depth / 2 >= 4.5 && z + depth / 2 <= 13.5, `${theme} attachment stays inside the Hero z range`)
-    assert(y + height / 2 <= 28.5, `${theme} attachment stays below the Hero height cap`)
+    assert(Math.abs(x) - width / 2 >= megaConfig.gate.width / 2 - 5, `${theme} attachment stays outside the protected central gate zone`)
+    assert(Math.abs(x) + width / 2 <= megaConfig.dimensions.width / 2, `${theme} attachment stays inside the Hero x range`)
+    assert(z - depth / 2 >= megaConfig.frontZ && z + depth / 2 <= megaConfig.frontZ + megaConfig.dimensions.depth, `${theme} attachment stays inside the Hero z range`)
+    assert(y + height / 2 <= megaConfig.dimensions.height, `${theme} attachment stays below the Hero height cap`)
     assert(Math.abs(x) - width / 2 > 3, `${theme} attachment stays clear of the central rotor`)
   }
   if (theme === 'harbor') {
-    assert.equal(signature.attachments.filter(item => item.size[1] === 11.4).length, 4, 'Harbor has two gate posts on each side')
+    assert.equal(signature.attachments.filter(item => item.size[1] === 33).length, 4, 'Harbor has two gate posts on each side')
     assert.equal(signature.attachments.filter(item => item.size[1] === .5).length, 2, 'Harbor has one top beam on each side')
     assert.equal(signature.attachments.filter(item => item.size[0] === 3).length, 4, 'Harbor has two outward corbels on each side')
   }
@@ -113,7 +118,7 @@ assert.match(scene, /emissive=\{night \? '#58798c' : undefined\} emissiveIntensi
 assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
 assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.55 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
-assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 41, 'Stage 19 adds one signature body batch and one night-only accent batch')
+assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 40, 'P0 mega greybox keeps the bounded shared Boxes budget')
 assert.equal([...scene.matchAll(/<instancedMesh\b/g)].length, 5, 'Stage 16 reuses the existing shared instancing mechanism')
 assert.match(scene, /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'public-space and Hero attachment boxes share one non-shadowing batch and night accents share one low-emission batch')
 assert.match(scene, /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'Theme OFF does not mount the signature overlay')
