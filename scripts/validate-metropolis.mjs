@@ -51,7 +51,7 @@ for (const weather of Object.values(weatherLighting)) {
 }
 assert.equal(megaPracticalPositions.length, 2, 'bounded practical light count')
 assert(megaPracticalPositions.every(position => position.every(Number.isFinite)), 'finite visible emitter positions')
-for (const mode of ['overview', 'mega']) {
+for (const mode of ['overview', 'mega', 'elevated']) {
   const { position, target, fov } = cameraViews[mode]
   const initial = createSceneCamera(mode)
   assert.deepEqual(initial.position.toArray(), position, `${mode}: first-frame position is ready before mount`)
@@ -62,7 +62,7 @@ for (const mode of ['overview', 'mega']) {
     assert(initial.position.y >= 3 && initial.position.y <= 10, 'hero camera height stays in the low dolly band')
     const elevation = Math.atan2(target[1] - initial.position.y, Math.hypot(initial.position.x - target[0], initial.position.z - target[2])) * 180 / Math.PI
     assert(elevation >= 8 && elevation <= 15, 'hero camera keeps the authored 8-15 degree elevation')
-  } else assert(initial.position.y > target[1], `${mode}: overview remains above subject`)
+  } else assert(initial.position.y > target[1], `${mode}: camera remains above subject`)
   assert.deepEqual(cameraPosition(mode, 1.5), position, `${mode}: desktop camera preset`)
   assert(fov > 30 && fov < 60, `${mode}: moderate perspective`)
   for (const aspect of [.5, 1, 1.5, 2.5]) {

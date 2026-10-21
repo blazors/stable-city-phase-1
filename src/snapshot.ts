@@ -3,6 +3,7 @@ import type { QualityPreset, RenderMetrics } from './CityScene'
 import type { Weather } from './Atmosphere'
 import { moodFromStored, type ResolvedMood } from './mood'
 import type { ThemeName } from './theme'
+import type { CameraMode } from './camera'
 
 export const SNAPSHOT_SCHEMA = 'stable-city.snapshot.v1'
 export const SNAPSHOT_STORAGE_KEY = 'stable-city:snapshots:v1'
@@ -15,7 +16,7 @@ export type GenerationTrace = {
   resolvedMoodSpec?: unknown; parameters?: Record<string, unknown> | null
   latencyMs?: number | null; tokens?: number | null; cost?: number | null; retry?: number | null; error?: string | null
 }
-export type CameraSnapshot = { mode: 'overview' | 'mega'; position: [number, number, number]; target: [number, number, number]; fov: number }
+export type CameraSnapshot = { mode: CameraMode; position: [number, number, number]; target: [number, number, number]; fov: number }
 export type SceneSnapshot = {
   schema: typeof SNAPSHOT_SCHEMA; snapshotId: string; createdAt: string; title: string; notes: string
   citySeed: string; stableCitySignature: string; theme: { name: ThemeName; version: string }; activeMood: ResolvedMood
@@ -59,7 +60,7 @@ export function sanitizeSnapshot(value: unknown): SceneSnapshot | null {
     theme: { name: oneOf(candidate.theme.name, ['harbor', 'verdant', 'ember'], 'harbor'), version: safeText(candidate.theme.version) }, activeMood,
     mood: { prompt: moodPrompt, source: safeText(candidate.mood?.source) || activeMood.source, version: finite(candidate.mood?.version, 1), resolvedMoodSpec: cleanMood(candidate.mood?.resolvedMoodSpec, moodPrompt) },
     time: oneOf(candidate.time, ['day', 'sunset', 'night'], activeMood.time), weather: oneOf(candidate.weather, ['clear', 'rain', 'snow', 'haze'], activeMood.weather),
-    camera: { mode: oneOf(candidate.camera.mode, ['overview', 'mega'], 'overview'), position: tuple3(candidate.camera.position), target: tuple3(candidate.camera.target), fov: finite(candidate.camera.fov, 45) },
+    camera: { mode: ((candidate.camera as unknown as { mode?: unknown }).mode === 'hero' ? 'mega' : oneOf(candidate.camera.mode, ['overview', 'mega', 'elevated'], 'overview')), position: tuple3(candidate.camera.position), target: tuple3(candidate.camera.target), fov: finite(candidate.camera.fov, 45) },
     quality: oneOf(candidate.quality, ['auto', 'high', 'balanced', 'low'], 'auto'), viewport: { width: finite(candidate.viewport?.width), height: finite(candidate.viewport?.height), dpr: finite(candidate.viewport?.dpr, 1) },
     capture: { mode: 'scene-raw-no-postprocess', mimeType: 'image/png', width: finite(candidate.capture?.width), height: finite(candidate.capture?.height), includesDomUi: false, includesPostprocess: false },
     generation: cleanTrace(candidate.generation), assets: { parentSnapshotId: candidate.assets?.parentSnapshotId ? safeText(candidate.assets.parentSnapshotId) : null, iteration: finite(candidate.assets?.iteration, 1) }, appVersion: safeText(candidate.appVersion), gitCommit: candidate.gitCommit ? safeText(candidate.gitCommit) : null,

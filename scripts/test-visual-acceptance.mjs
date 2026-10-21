@@ -23,6 +23,7 @@ const strict = parseVisualAcceptance('?view=quality&theme=ember&theme=invalid&mo
 assert.deepEqual({ theme: strict.theme, mode: strict.mode, time: strict.time, weather: strict.weather, quality: strict.quality, compare: strict.compare }, {
   theme: 'ember', mode: 'overview', time: 'day', weather: 'rain', quality: 'low', compare: 'baseline',
 }, 'enum values are strict, field-local, and duplicate values use the first item')
+assert.equal(parseVisualAcceptance('?view=quality&mode=elevated').mode, 'elevated', '3Q Elevated is a supported acceptance mode')
 
 const plan = createVisualAcceptancePlan(2401, '/city/')
 assert.equal(plan.schemaVersion, 1)
@@ -32,7 +33,7 @@ assert.equal(plan.cameraLocked, true)
 assert.deepEqual(plan.viewport, { width: 1280, height: 720, deviceScaleFactor: 1 })
 assert.deepEqual(plan.scenarios.map(scenario => scenario.id), [
   'harbor-sunset', 'harbor-baseline', 'verdant-sunset', 'ember-sunset', 'harbor-day', 'harbor-night',
-  'ember-rain-low', 'verdant-snow-balanced', 'harbor-haze-mega',
+  'ember-rain-low', 'verdant-snow-balanced', 'harbor-haze-mega', 'harbor-elevated',
 ])
 for (const scenario of plan.scenarios) {
   assert.equal(scenario.url.startsWith('/city/?'), true, `${scenario.id} has a full relative URL`)
@@ -50,6 +51,7 @@ assert.equal(plan.scenarios[7].quality, 'balanced')
 assert.equal(plan.scenarios[7].mode, 'overview')
 assert.equal(plan.scenarios[7].time, 'day')
 assert.equal(plan.scenarios[8].mode, 'mega')
+assert.equal(plan.scenarios[9].mode, 'elevated')
 assert.equal(plan.animationCapture.framePolicy, 'not-pixel-identical')
 
 console.log('Visual acceptance pure-function checks passed.')

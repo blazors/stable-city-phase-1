@@ -9,6 +9,7 @@ import { useThree } from '@react-three/fiber'
 import { sunDirection, type Weather } from './Atmosphere'
 import type { TimeOfDay } from './city'
 import type { QualityPreset } from './CityScene'
+import type { CameraMode } from './camera'
 import { lensBudgets, lensSafeHalfSize, lensStrength, lensWeatherProfiles } from './weatherLens'
 
 const vertexShader = `
@@ -141,7 +142,7 @@ const lensShader = { uniforms: {
   uGrid: { value: new Vector2() }, uSafe: { value: new Vector2(...lensSafeHalfSize) }, uSun: { value: new Vector2() }, uWeather: { value: [0, 0, 0, 0] },
 }, vertexShader, fragmentShader: postFragmentShader }
 
-function PostProcessLens({ time, weather, quality, mode, elapsed }: { time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'; elapsed: MutableRefObject<number> }) {
+function PostProcessLens({ time, weather, quality, mode, elapsed }: { time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: CameraMode; elapsed: MutableRefObject<number> }) {
   const { gl, scene, camera, size, viewport } = useThree()
   const composer = useRef<EffectComposer | null>(null), pass = useRef<ShaderPass | null>(null), motion = useRef(true)
   const sun = useMemo(() => new Vector3(), [])
@@ -205,7 +206,7 @@ function PostProcessLens({ time, weather, quality, mode, elapsed }: { time: Time
 }
 
 function OverlayLensWeather({ time, weather, quality, mode, elapsed }: {
-  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'; elapsed: MutableRefObject<number>
+  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: CameraMode; elapsed: MutableRefObject<number>
 }) {
   const material = useRef<ShaderMaterial>(null), motion = useRef(true)
   const sun = useMemo(() => new Vector3(), [])
@@ -244,7 +245,7 @@ function OverlayLensWeather({ time, weather, quality, mode, elapsed }: {
 }
 
 export function LensWeather({ time, weather, quality, mode }: {
-  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: 'overview' | 'mega'
+  time: TimeOfDay; weather: Weather; quality: QualityPreset; mode: CameraMode
 }) {
   const elapsed = useRef(0)
   return quality !== 'low' && (weather === 'rain' || weather === 'snow')

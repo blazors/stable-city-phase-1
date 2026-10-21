@@ -5,9 +5,10 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 const checks = [
-  ['P0 scene config centralizes authored cameras and mega dimensions', /export const sceneConfig = \{[\s\S]*overview: \{ position: \[-270, 155, -305\].*target: \[0, 28, 45\].*fov: 46[\s\S]*hero: \{ position: \[-65, 7, -205\].*target: \[0, 52, 9\].*fov: 40[\s\S]*width: 64, height: 96, depth: 18/, 'src/sceneConfig.ts'],
-  ['P0 camera keeps the legacy mega mode mapped to the authored Hero preset', /mega: cameraConfig\.hero[\s\S]*hero: cameraConfig\.hero/, 'src/camera.ts'],
+  ['P0 scene config centralizes authored cameras and mega dimensions', /cameraPreset = \{[\s\S]*overview: \{ position: \[-270, 155, -305\].*target: \[0, 28, 45\].*fov: 46[\s\S]*hero: \{ position: \[-65, 7, -205\].*target: \[0, 52, 9\].*fov: 40[\s\S]*elevated: \{[\s\S]*width: 64, height: 96, depth: 18[\s\S]*gateHeightScale: 1[\s\S]*beamDepth: 6[\s\S]*portalWidth: 36[\s\S]*bridgePath[\s\S]*bridgeHeight/, 'src/sceneConfig.ts'],
+  ['P0 camera keeps the legacy mega mode mapped to the authored Hero preset and adds 3Q Elevated', /heroCameraPreset = \{[\s\S]*mega: heroCameraPreset[\s\S]*elevated: cameraConfig\.cameraPreset\.elevated/, 'src/camera.ts'],
   ['P0 mega greybox exposes beams, inset and braces', /export const megaMajorBraces[\s\S]*export const megaDoorPillars[\s\S]*export const megaDoorBeam[\s\S]*export const megaDeepEntrance/, 'src/megaGeometry.ts'],
+  ['P0 mega gate is a deep negative-space portal with a supported bridge', /rear wall is deliberately deep[\s\S]*createMegaBridgeGeometry[\s\S]*Three grounded piers/, 'src/megaGeometry.ts'],
   ['P0 clearance is rendering-only and deterministic', /deriveMegaHeroClearance[\s\S]*clearedBuildingIds[\s\S]*visibleBuildings/, 'src/megaGeometry.ts'],
   ['P0 shadow camera covers the 96-unit hero without covering the whole city', /shadow-camera-left=\{-70\} shadow-camera-right=\{70\} shadow-camera-top=\{110\} shadow-camera-bottom=\{-25\}/, 'src/CityScene.tsx'],
   ['StableCity block contract', /city\.blocks\.length !== 16/, 'src/city.ts'],

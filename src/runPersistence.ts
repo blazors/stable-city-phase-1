@@ -5,6 +5,7 @@ import type { Weather } from './Atmosphere'
 import type { RequestedStrategy, Capability } from './router'
 import { migrateWeatherDraft, weatherSchemaVersion } from './weather'
 import type { ResolvedMood } from './mood'
+import type { CameraMode } from './camera'
 
 const UI_KEY = 'stable-city:ui-draft:v1'
 const PRODUCTION_KEY = 'stable-city:production-draft:v1'
@@ -16,7 +17,7 @@ export type ThemeMatrixResult = Record<ThemeName, { stableCity: boolean; themeSp
 export type UiDraft = {
   weather?: Weather
   weatherVersion?: number
-  time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey
+  time: TimeOfDay; mode: CameraMode; theme: ThemeName; enabled: boolean; quality: QualityPreset; view: ViewName; selectedAsset: AssetKey
   decisions?: StoredDecision[]; checked?: string[]; qcResult?: boolean | null; qcIssues?: string[]; themeOffResult?: boolean | null; themeMatrixResult?: ThemeMatrixResult | null
   activeMood?: ResolvedMood; prompt?: string; source?: 'local-rule'; version?: number
 }
@@ -38,7 +39,10 @@ function write<T>(key: string, value: T) {
 
 export function loadUiDraft(): Partial<UiDraft> | null {
   const draft = read<Partial<UiDraft>>(UI_KEY)
-  return draft ? migrateWeatherDraft(draft) : null
+  if (!draft) return null
+  const storedMode = (draft as { mode?: unknown }).mode
+  const mode: CameraMode | undefined = storedMode === 'overview' || storedMode === 'mega' || storedMode === 'elevated' ? storedMode : storedMode === 'hero' ? 'mega' : undefined
+  return migrateWeatherDraft({ ...draft, mode })
 }
 export function saveUiDraft(value: UiDraft) { write(UI_KEY, { ...value, weatherVersion: weatherSchemaVersion }) }
 export function clearUiDraft() { try { window.localStorage.removeItem(UI_KEY) } catch { /* ignore */ } }

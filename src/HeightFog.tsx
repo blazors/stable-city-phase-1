@@ -2,9 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Color, Mesh, MeshStandardMaterial } from 'three'
 import type { QualityPreset } from './CityScene'
+import type { CameraMode } from './camera'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 
-export function HeightFog({ color, mode, quality, densityScale = 1 }: { color: string; mode: 'overview' | 'mega'; quality: QualityPreset; densityScale?: number }) {
+export function HeightFog({ color, mode, quality, densityScale = 1 }: { color: string; mode: CameraMode; quality: QualityPreset; densityScale?: number }) {
   const { scene } = useThree()
   const motion = useRef(true), elapsed = useRef(0)
   const uniforms = useMemo(() => ({

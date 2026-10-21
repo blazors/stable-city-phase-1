@@ -1,4 +1,5 @@
 import type { QualityPreset } from './CityScene'
+import type { CameraMode } from './camera'
 
 // Both cameras observe the same world-space layer; only optical density changes.
 export const heightFogTop = 17
@@ -6,7 +7,7 @@ export const heightFogFalloff = 7
 export const heightFogBudgets = { high: 2, auto: 2, balanced: 1, low: 0 } satisfies Record<QualityPreset, number>
 // Keep the fog sea readable instead of saturating the long overview sight line.
 // The close camera needs slightly less attenuation so the megastructure retains detail.
-export function heightFogDensity(mode: 'overview' | 'mega') { return mode === 'mega' ? .024 : .032 }
+export function heightFogDensity(mode: CameraMode) { return mode === 'mega' || mode === 'elevated' ? .024 : .032 }
 
 export function heightFogPrimitive(y: number, top = heightFogTop, falloff = heightFogFalloff) {
   if (y >= top) return 0

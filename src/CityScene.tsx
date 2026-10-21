@@ -11,9 +11,9 @@ import { Rain, Snow } from './Precipitation'
 import { LensWeather } from './LensWeather'
 import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
-import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset } from './camera'
+import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, megaRoofDeck, megaRoofFascia } from './megaGeometry'
+import { createMegaBridgeGeometry, createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
@@ -176,6 +176,7 @@ function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { 
   useFrame((_, delta) => { if (rotor.current) rotor.current.rotation.y += delta * .13 })
   const structure = useMemo(() => createMegaStructureGeometry(), [])
   const ribs = useMemo(() => createMegaRoofRibs(), [])
+  const bridge = useMemo(() => createMegaBridgeGeometry(), [])
   const spec = theme ? themeSpecs[theme] : null
   return <>
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} items={[
@@ -185,6 +186,9 @@ function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { 
     <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
       ...structure.inset, megaRoofDeck,
     ]} />
+    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, bridge.platform]} />
+    <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
+    <Boxes color={accent} emissive={accent} glow night={night} items={bridge.rails} />
     <Boxes color={accent} emissive={accent} glow night={night} items={[
       megaRoofFascia,
       ...megaPracticalPositions.map(position => ({ position, size: [.12, 17, .15] as Vec3 })),
@@ -199,7 +203,7 @@ function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { 
   </>
 }
 
-function Water({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset; mood: ResolvedMood | null }) {
+function Water({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: CameraMode; quality: QualityPreset; mood: ResolvedMood | null }) {
   const overviewOffset = mode === 'overview' ? overviewDistanceOffset() : 0
   const reflectionWeights = [.38, .68, .28, .52, .32] as const
   const reflectionAnchors = riverReflectionSources.map((x, index) => `reflection+=anchorReflection(world,${x.toFixed(1)},${reflectionWeights[index].toFixed(2)});`).join('\n')
@@ -308,7 +312,7 @@ function Water({ time, weather, mode, quality, mood }: { time: TimeOfDay; weathe
   </mesh>
 }
 
-function Ground({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: 'overview' | 'mega'; quality: QualityPreset; mood?: ResolvedMood }) {
+function Ground({ time, weather, mode, quality, mood }: { time: TimeOfDay; weather: Weather; mode: CameraMode; quality: QualityPreset; mood?: ResolvedMood }) {
   const night = time === 'night'
   const details = useMemo(() => {
     const paving: Box[] = [], road: Box[] = [], markings: Box[] = [], lamps: Box[] = [], supports: Box[] = []
@@ -468,7 +472,7 @@ function Transport({ night, count }: { night: boolean; count: number }) {
   </>
 }
 
-function CameraDirector({ mode }: { mode: 'overview' | 'mega' }) {
+function CameraDirector({ mode }: { mode: CameraMode }) {
   const { camera, size } = useThree()
   useLayoutEffect(() => {
     if ('aspect' in camera) camera.aspect = size.width / Math.max(1, size.height)
@@ -526,7 +530,7 @@ function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
 }
 
 export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', benchmark = false, mood: moodProp, onUpdate, onReady, onError, onCanvasReady }: {
-  time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
+  time: TimeOfDay; mode: CameraMode; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
   mood?: ResolvedMood

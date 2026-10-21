@@ -169,6 +169,7 @@ for (let i = 1; i < qualities.length; i++) {
 assert.equal(lensStrength('day', 'overview'), 1)
 assert.equal(lensStrength('day', 'mega'), .8)
 assert.equal(lensStrength('night', 'mega'), .52)
+assert.equal(lensStrength('day', 'elevated'), .8)
 const rainA = rainCandidates(.37, .499, 0, 10, 6), rainB = rainCandidates(.37, .501, 0, 10, 6)
 assert.equal(rainA.length, 3); assert.equal(rainB.length, 3)
 assert.deepEqual(rainA.slice(1).map(drop => [drop.seed, drop.x, drop.size, drop.present]), rainB.slice(0, 2).map(drop => [drop.seed, drop.x, drop.size, drop.present]), 'adjacent row candidates retain stable identity at a boundary')

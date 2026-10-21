@@ -1,13 +1,15 @@
 import { PerspectiveCamera } from 'three'
 import { cameraConfig, type Vec3 } from './sceneConfig'
 
-export type CameraMode = 'overview' | 'mega' | 'hero'
+export type CameraMode = 'overview' | 'mega' | 'elevated'
+const heroCameraPreset = { ...cameraConfig.cameraPreset.hero, target: cameraConfig.heroCameraTarget, fov: cameraConfig.heroCameraFov }
 
 export const cameraViews = {
-  overview: cameraConfig.overview,
+  overview: cameraConfig.cameraPreset.overview,
   // `mega` is retained as the UI and persistence mode name; `hero` is the authored preset name.
-  mega: cameraConfig.hero,
-  hero: cameraConfig.hero,
+  mega: heroCameraPreset,
+  elevated: cameraConfig.cameraPreset.elevated,
+  hero: heroCameraPreset,
 }
 export const overviewDistanceOffset = () => Math.max(0, Math.hypot(...cameraViews.overview.position.map((value, axis) => value - cameraViews.overview.target[axis])) - 420)
 

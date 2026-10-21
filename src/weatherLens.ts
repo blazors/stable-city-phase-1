@@ -1,6 +1,7 @@
 import type { Weather } from './Atmosphere'
 import type { TimeOfDay } from './city'
 import type { QualityPreset } from './CityScene'
+import type { CameraMode } from './camera'
 
 export const lensBudgets = {
   high: { detail: 3, columns: 12, rows: 7 },
@@ -24,8 +25,8 @@ export function lensEdgeMask(u: number, v: number) {
   return t * t * (3 - 2 * t)
 }
 
-export function lensStrength(time: TimeOfDay, mode: 'overview' | 'mega') {
-  return (time === 'night' ? .65 : 1) * (mode === 'mega' ? .8 : 1)
+export function lensStrength(time: TimeOfDay, mode: CameraMode) {
+  return (time === 'night' ? .65 : 1) * (mode === 'mega' || mode === 'elevated' ? .8 : 1)
 }
 
 export type RainCandidate = { row: number; seed: number; x: number; size: number; present: boolean }

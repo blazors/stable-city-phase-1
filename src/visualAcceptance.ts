@@ -2,11 +2,12 @@ import type { TimeOfDay } from './city'
 import type { QualityPreset } from './CityScene'
 import type { ThemeName } from './theme'
 import type { Weather } from './Atmosphere'
+import type { CameraMode } from './camera'
 
 export type VisualAcceptance = {
   view: 'quality'
   theme: ThemeName
-  mode: 'overview' | 'mega'
+  mode: CameraMode
   time: TimeOfDay
   weather: Weather
   quality: QualityPreset
@@ -45,7 +46,7 @@ export function parseVisualAcceptance(search: string): VisualAcceptance | null {
   return {
     view: 'quality',
     theme: enumValue(params, 'theme', ['harbor', 'verdant', 'ember'], 'harbor'),
-    mode: enumValue(params, 'mode', ['overview', 'mega'], 'overview'),
+    mode: enumValue(params, 'mode', ['overview', 'mega', 'elevated'], 'overview'),
     time: enumValue(params, 'time', ['sunset', 'day', 'night'], 'sunset'),
     weather: enumValue(params, 'weather', ['clear', 'rain', 'snow', 'haze'], 'clear'),
     quality: enumValue(params, 'quality', ['high', 'balanced', 'low', 'auto'], 'high'),
@@ -63,6 +64,7 @@ const scenarioDefinitions: Array<Omit<AcceptanceScenario, 'url' | 'captureTarget
   { id: 'ember-rain-low', view: 'quality', theme: 'ember', mode: 'mega', time: 'night', weather: 'rain', quality: 'low', compare: 'theme' },
   { id: 'verdant-snow-balanced', view: 'quality', theme: 'verdant', mode: 'overview', time: 'day', weather: 'snow', quality: 'balanced', compare: 'theme' },
   { id: 'harbor-haze-mega', view: 'quality', theme: 'harbor', mode: 'mega', time: 'sunset', weather: 'haze', quality: 'high', compare: 'theme' },
+  { id: 'harbor-elevated', view: 'quality', theme: 'harbor', mode: 'elevated', time: 'sunset', weather: 'clear', quality: 'high', compare: 'theme' },
 ]
 
 export function createVisualAcceptancePlan(seed: number, pathname: string): VisualAcceptancePlan {

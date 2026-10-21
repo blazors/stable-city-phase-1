@@ -118,7 +118,7 @@ assert.match(scene, /emissive=\{night \? '#58798c' : undefined\} emissiveIntensi
 assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
 assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.55 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
-assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 40, 'P0 mega greybox keeps the bounded shared Boxes budget')
+assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 43, 'P0 mega greybox keeps the bounded shared Boxes budget with the bridge batches')
 assert.equal([...scene.matchAll(/<instancedMesh\b/g)].length, 5, 'Stage 16 reuses the existing shared instancing mechanism')
 assert.match(scene, /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'public-space and Hero attachment boxes share one non-shadowing batch and night accents share one low-emission batch')
 assert.match(scene, /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'Theme OFF does not mount the signature overlay')

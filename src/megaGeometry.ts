@@ -13,6 +13,10 @@ export const megaRoofDeck: MegaBox = { position: [0, megaRoofSupportTop + .45, 9
 export const megaRoofRibY = megaRoofSupportTop + 2
 export const megaRoofRibHeight = 2.1
 
+const gateHeight = megaConfig.gate.height * megaConfig.gateHeightScale
+const gateDepth = megaConfig.gate.depth
+const gateBeamDepth = Math.min(megaConfig.beamDepth, gateDepth)
+
 export const megaMainBodies: MegaBox[] = [
   { position: [-27, 48, 9], size: [10, 96, 18] },
   { position: [27, 48, 9], size: [10, 96, 18] },
@@ -21,10 +25,13 @@ export const megaMainBodies: MegaBox[] = [
 ]
 
 export const megaGateInset: MegaBox[] = [
-  { position: [0, 28, 4.5], size: [36, 56, .55] },
-  { position: [-18, 32, 3.5], size: [.8, 64, 6] },
-  { position: [18, 32, 3.5], size: [.8, 64, 6] },
-  { position: [0, 60, 3.5], size: [36, .8, 6] },
+  // The rear wall is deliberately deep in the portal. The front remains a
+  // negative-space opening so the hero camera reads a real tunnel, not a decal.
+  { position: [0, gateHeight / 2, gateDepth - .8], size: [megaConfig.portalWidth, gateHeight, .8] },
+  { position: [-megaConfig.portalWidth / 2, gateHeight / 2, gateDepth / 2], size: [.8, gateHeight + 8, gateDepth] },
+  { position: [megaConfig.portalWidth / 2, gateHeight / 2, gateDepth / 2], size: [.8, gateHeight + 8, gateDepth] },
+  { position: [0, gateHeight, gateDepth / 2], size: [megaConfig.portalWidth, .8, gateDepth] },
+  { position: [0, gateHeight - .45, gateBeamDepth / 2], size: [megaConfig.portalWidth + .8, .55, gateBeamDepth] },
 ]
 
 export const megaMajorBraces: MegaBox[] = [
@@ -36,6 +43,36 @@ export const megaMajorBraces: MegaBox[] = [
 export const megaDoorPillars = megaMainBodies.slice(0, 2)
 export const megaDoorBeam = megaMainBodies[2]
 export const megaDeepEntrance = megaGateInset[0]
+
+type BridgeNode = Vec3
+export type MegaBridgeGeometry = { decks: MegaBox[]; rails: MegaBox[]; supports: MegaBox[]; platform: MegaBox }
+
+const bridgeSegment = (from: BridgeNode, to: BridgeNode, width: number, yOffset = 0): MegaBox => {
+  const dx = to[0] - from[0], dz = to[2] - from[2], length = Math.hypot(dx, dz)
+  return { position: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + yOffset, (from[2] + to[2]) / 2], size: [width, .8, length], rotation: [0, Math.atan2(dx, dz), 0] }
+}
+
+export function createMegaBridgeGeometry(): MegaBridgeGeometry {
+  const width = 6
+  const decks: MegaBox[] = [], rails: MegaBox[] = [], supports: MegaBox[] = []
+  for (let i = 0; i < megaConfig.bridgePath.length - 1; i++) {
+    const from = megaConfig.bridgePath[i], to = megaConfig.bridgePath[i + 1]
+    const dx = to[0] - from[0], dz = to[2] - from[2], angle = Math.atan2(dx, dz)
+    decks.push(bridgeSegment(from, to, width))
+    for (const side of [-1, 1]) {
+      const offsetX = Math.cos(angle) * side * (width / 2 - .24), offsetZ = -Math.sin(angle) * side * (width / 2 - .24)
+      rails.push({ ...bridgeSegment(from, to, .28, .58), position: [(from[0] + to[0]) / 2 + offsetX, (from[1] + to[1]) / 2 + .58, (from[2] + to[2]) / 2 + offsetZ] })
+    }
+  }
+  // Three grounded piers plus a fourth at the gate approach keep the elevated
+  // route legible as a supported platform instead of a floating ribbon.
+  for (const [x, , z] of megaConfig.bridgePath.slice(0, 3)) {
+    supports.push({ position: [x, megaConfig.bridgeHeight / 2, z], size: [.9, megaConfig.bridgeHeight, .9] })
+    supports.push({ position: [x, megaConfig.bridgeHeight - .55, z], size: [width + 1, .7, 1.1] })
+  }
+  const last = megaConfig.bridgePath.at(-1)!
+  return { decks, rails, supports, platform: { position: [last[0], last[1], last[2] + 2.2], size: [width, .8, 4.4] } }
+}
 
 export function createMegaStructureGeometry() {
   return {
