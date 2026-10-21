@@ -88,33 +88,33 @@ export function buildThemeSignature(theme: ThemeName | null): ThemeSignature {
   for (const side of [-1, 1]) {
     if (theme === 'harbor') {
       // Open gate frames sit beside the hero, with outward corbels and clear centers.
-      for (const z of [-4, 4]) attachments.push(box([side * 18.2, heroAnchor.y + 1.2, heroAnchor.z + z], [.6, 33, .6], spec.primary))
-      attachments.push(box([side * 18.2, heroAnchor.y + 27.2, heroAnchor.z], [.6, .5, 9.2], spec.trim))
-      for (const z of [-4, 4]) attachments.push(box([side * 21, heroAnchor.y + 22, heroAnchor.z + z], [3, .7, .65], spec.trim))
-      accents.push(heroAccent([side * 18.2, heroAnchor.y + 27.25, heroAnchor.z], [.34, .08, 5.6], spec.accent))
+      for (const z of [-4, 4]) attachments.push(box([side * 37.2, heroAnchor.y + 1.2, heroAnchor.z + z], [.6, 33, .6], spec.primary))
+      attachments.push(box([side * 37.2, heroAnchor.y + 25.5, heroAnchor.z], [.6, .5, 9.2], spec.trim))
+      for (const z of [-4, 4]) attachments.push(box([side * 40, heroAnchor.y + 22, heroAnchor.z + z], [3, .7, .65], spec.trim))
+      accents.push(heroAccent([side * 37.2, heroAnchor.y + 25.55, heroAnchor.z], [.34, .08, 5.6], spec.accent))
     }
 
     if (theme === 'verdant') {
       // Three offset wing shelves and narrow vertical supports on each side.
       for (const [tier, offset] of [[0, 0], [1, -.35], [2, -.7]] as const) {
-        attachments.push(box([side * (19 + offset), heroAnchor.y + tier * 8, heroAnchor.z], [tier === 2 ? 6.8 : 7.2, .38, 7.8], spec.foliage))
+        attachments.push(box([side * (37 + offset), heroAnchor.y + tier * 8, heroAnchor.z], [tier === 2 ? 6.8 : 7.2, .38, 7.8], spec.foliage))
       }
-      attachments.push(box([side * 17.8, heroAnchor.y + 8, heroAnchor.z - 2.1], [.24, 18, .34], spec.trim))
-      attachments.push(box([side * 17.8, heroAnchor.y + 8, heroAnchor.z + 2.1], [.24, 18, .34], spec.trim))
-      accents.push(heroAccent([side * 19, heroAnchor.y + 8.16, heroAnchor.z - 3.1], [2.8, .08, .14], spec.accent))
+      attachments.push(box([side * 36.8, heroAnchor.y + 8, heroAnchor.z - 2.1], [.24, 18, .34], spec.trim))
+      attachments.push(box([side * 36.8, heroAnchor.y + 8, heroAnchor.z + 2.1], [.24, 18, .34], spec.trim))
+      accents.push(heroAccent([side * 37, heroAnchor.y + 8.16, heroAnchor.z - 3.1], [2.8, .08, .14], spec.accent))
     }
 
     if (theme === 'ember') {
       // Three vents climb outward on each side above a compact support beam.
-      const positions = [18.2, 20.5, 22.8]
+      const positions = [37.2, 40.5, 43.8]
       const heights = [12, 19, 26]
       for (const [index, x] of positions.entries()) {
         const height = heights[index]
         attachments.push(box([side * x, heroAnchor.y - 7 + height / 2, heroAnchor.z], [.55, height, .8], spec.primary))
         attachments.push(box([side * x, heroAnchor.y - 7 + height + .18, heroAnchor.z], [.92, .36, 1.2], spec.trim))
       }
-      attachments.push(box([side * 20.5, heroAnchor.y - 7, heroAnchor.z], [5.1, .4, .65], spec.trim))
-      accents.push(heroAccent([side * 22.8, heroAnchor.y + 19.2, heroAnchor.z], [.44, .12, .48], spec.accent))
+      attachments.push(box([side * 40.5, heroAnchor.y - 7, heroAnchor.z], [5.1, .4, .65], spec.trim))
+      accents.push(heroAccent([side * 43.8, heroAnchor.y + 19.2, heroAnchor.z], [.44, .12, .48], spec.accent))
     }
   }
 

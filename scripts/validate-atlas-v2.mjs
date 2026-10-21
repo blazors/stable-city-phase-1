@@ -15,18 +15,27 @@ const city = await moduleFrom(transpile(await readFile(new URL('../src/city.ts',
 const config = sceneConfig.mega
 const structure = mega.createMegaStructureGeometry()
 const bridge = mega.createMegaBridgeGeometry()
-const backWall = structure.inset[0]
-assert(backWall.position[2] > config.frontZ + 1, 'gate rear wall is recessed behind the front plane')
-assert(backWall.size[2] < config.gate.depth, 'gate has an actual open tunnel depth')
-assert(structure.inset.some(item => item.position[0] < 0 && item.size[2] === config.gate.depth), 'gate has a left side wall')
-assert(structure.inset.some(item => item.position[0] > 0 && item.size[2] === config.gate.depth), 'gate has a right side wall')
+assert.deepEqual(config.dimensions, { width: 132, height: 92, depth: 36 }, 'mega overall dimensions are 132 x 92 x 36')
+assert.deepEqual(config.center, [0, 46, 18], 'mega center is authored at [0,46,18]')
+assert.deepEqual(config.gate, { width: 66, height: 66, depth: 36 }, 'portal clear opening is 66 x 66 x 36')
+assert.equal(structure.inset.length, 0, 'portal has no rear wall or inset solids')
+assert.deepEqual(structure.bodies.slice(0, 2).map(item => item.size), [[22, 52, 36], [22, 52, 36]], 'upper pillars use authored 22 x 52 x 36 sections')
+assert.deepEqual(structure.bodies.slice(2, 4).map(item => item.size), [[30, 14, 40], [30, 14, 40]], 'expanded bases use authored 30 x 14 x 40 sections')
+assert.deepEqual(structure.bodies[4].size, [120, 22, 36], 'main beam uses authored 120 x 22 x 36 section')
+assert.deepEqual(mega.megaRoofFascia.size, [132, 4, 40], 'top cap uses authored 132 x 4 x 40 section')
+assert.equal(mega.createMegaRoofRibs().length, 9, 'roof ribs are reduced to nine')
+assert(mega.createMegaRoofRibs().every(item => item.size[1] >= .8 && item.size[1] <= 1.2), 'roof ribs stay within the reduced height budget')
+assert.equal(structure.braces.length, 4, 'two real 8 x 8 braces per side are present')
+assert(structure.braces.every(item => item.size[0] === 8 && item.size[2] === 8), 'braces retain a real 8 x 8 cross-section')
 assert(bridge.decks.length === config.bridgePath.length - 1, 'bridge deck follows every path segment')
 assert(bridge.rails.length === bridge.decks.length * 2, 'bridge has two continuous rail edges')
 assert(bridge.supports.filter(item => item.size[1] >= config.bridgeHeight).length >= 3, 'bridge has at least three grounded piers')
 const endpoint = config.bridgePath.at(-1)
 assert(Math.abs(endpoint[0]) < config.portalWidth / 2, 'bridge endpoint enters portal width')
-assert(endpoint[2] > config.frontZ && endpoint[2] < config.frontZ + config.gate.depth, 'bridge endpoint enters the gate tunnel')
-assert(bridge.platform.position[2] > endpoint[2], 'bridge endpoint lands on the interior platform')
+assert(config.bridgePath.some(([, , z]) => z > config.frontZ && z < config.frontZ + config.gate.depth), 'bridge path enters the gate tunnel')
+assert(Math.abs(bridge.platform.position[2] - endpoint[2]) <= bridge.platform.size[2] / 2, 'bridge endpoint lands on the interior platform')
+assert.deepEqual(bridge.platform, { position: [0, 15, 37], size: [12, .8, 14] }, 'interior platform is authored at [0,15,37]')
+assert(endpoint[2] > config.frontZ + config.dimensions.depth, 'bridge extends through and beyond the rear facade')
 
 const visibleBuildings = mega.deriveMegaHeroClearance(city.createStableCity()).visibleBuildings
 const clearAt = (x, z, radius = 3.2) => visibleBuildings.every(building =>
@@ -42,6 +51,8 @@ for (let i = 0; i < config.bridgePath.length - 1; i++) {
 }
 
 const elevatedCamera = camera.createSceneCamera('elevated')
+assert.deepEqual(camera.cameraViews.hero, { position: [-48, 6, -142], target: [0, 42, 14], fov: 46 }, 'Hero camera matches authored composition')
+assert.deepEqual(camera.cameraViews.elevated, { position: [-125, 63, -155], target: [0, 37, 18], fov: 46 }, 'Elevated camera matches authored composition')
 elevatedCamera.aspect = 1280 / 720
 elevatedCamera.position.set(...camera.cameraPosition('elevated', elevatedCamera.aspect))
 elevatedCamera.lookAt(...camera.cameraViews.elevated.target)

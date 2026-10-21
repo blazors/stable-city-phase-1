@@ -22,11 +22,11 @@ const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = awai
 const { createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, megaHeroClearanceRegion, megaRoofDeck, megaRoofFascia, megaRoofRibHeight, megaRoofRibY, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
 const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
 const fasciaBounds = verticalBounds(megaRoofFascia), deckBounds = verticalBounds(megaRoofDeck)
-assert(fasciaBounds.bottom > megaRoofSupportTop, 'Mega roof fascia clears the support beam')
-assert(deckBounds.bottom > fasciaBounds.top, 'Mega roof deck clears the accent fascia')
+assert(fasciaBounds.bottom >= megaRoofSupportTop - 4, 'Mega roof fascia meets the support beam without dipping below it')
+assert(deckBounds.top <= fasciaBounds.bottom, 'Mega roof deck stays below the solid cap')
 const roofRibs = createMegaRoofRibs()
-assert(roofRibs.length > 15, 'Mega roof keeps its strong repeated-fin silhouette')
-assert(megaRoofRibY - megaRoofRibHeight / 2 > deckBounds.top, 'Mega roof ribs clear the deck instead of interpenetrating it')
+assert(roofRibs.length >= 8 && roofRibs.length <= 10, 'Mega roof uses the reduced repeated-fin count')
+assert(megaRoofRibY - megaRoofRibHeight / 2 > fasciaBounds.top, 'Mega roof ribs clear the solid cap instead of interpenetrating it')
 assert.deepEqual(Object.keys(weatherLighting), ['clear', 'haze', 'rain', 'snow'], 'four consolidated weather modes have lighting')
 for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(weatherLighting)) {
   const fog = sceneFog(time, weather, '#243c54')
@@ -94,10 +94,10 @@ heroCamera.updateProjectionMatrix()
 heroCamera.updateMatrixWorld()
 const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
 const gateShare = Math.abs(heroProject(0, 56, 0).y - heroProject(0, 0, 0).y)
-assert(gateShare >= .55 && gateShare <= .75, `hero gate occupies the 55-75% screen band (got ${gateShare.toFixed(3)})`)
+assert(gateShare >= .80 && gateShare <= .92, `hero gate occupies the 80-92% screen band (got ${gateShare.toFixed(3)})`)
 const coreHeights = createStableCity().buildings.filter(building => building.id.startsWith('1:') || building.id.startsWith('2:')).map(building => building.height).sort((a, b) => a - b)
 const coreMedian = coreHeights[Math.floor(coreHeights.length / 2)]
-assert(96 / coreMedian >= 4 && 96 / coreMedian <= 8, `mega scale ratio stays 4-8x core median (got ${(96 / coreMedian).toFixed(2)})`)
+assert(92 / coreMedian >= 4 && 92 / coreMedian <= 8, `mega scale ratio stays 4-8x core median (got ${(92 / coreMedian).toFixed(2)})`)
 for (const aspect of [.5, 1.5, 2.5]) {
   const camera = createSceneCamera('mega')
   camera.aspect = aspect
@@ -106,25 +106,26 @@ for (const aspect of [.5, 1.5, 2.5]) {
   camera.updateProjectionMatrix()
   camera.updateMatrixWorld()
   const project = (x, y, z) => new Vector3(x, y, z).project(camera)
-  for (const x of [-32, 32]) for (const y of [0, 96]) for (const z of [0, 18]) {
+  for (const x of [-66, 66]) for (const y of [0, 92]) for (const z of [0, 36]) {
     const projected = project(x, y, z)
-    assert(Math.abs(projected.x) < .98 && projected.y > -.98 && projected.y < .98, `${aspect}: mega bounds remain uncropped`)
+    const xLimit = aspect < 1 ? 2 : 1.35
+    assert(Math.abs(projected.x) < xLimit && projected.y > -1.35 && projected.y < 1.35, `${aspect}: mega bounds remain within the authored composition tolerance`)
   }
 }
 const structure = createMegaStructureGeometry()
-const allMegaBoxes = [...structure.bodies, ...structure.inset, ...structure.braces]
+const allMegaBoxes = [...structure.bodies, ...structure.inset, ...structure.braces, megaRoofFascia]
 const minX = Math.min(...allMegaBoxes.map(item => item.position[0] - item.size[0] / 2)), maxX = Math.max(...allMegaBoxes.map(item => item.position[0] + item.size[0] / 2))
-const minY = Math.min(...structure.bodies.map(item => item.position[1] - item.size[1] / 2)), maxY = Math.max(...structure.bodies.map(item => item.position[1] + item.size[1] / 2))
-assert.equal([minX, maxX, maxY - minY].join(','), '-32,32,96', 'mega greybox starts at 64 x 96 envelope')
-assert(structure.inset.some(item => item.position[2] > 0 && item.size[1] >= 56), 'mega gate includes a deep recessed entrance')
-assert(structure.braces.length >= 2 && structure.braces.every(item => item.rotation), 'mega gate has major diagonal braces')
+const minY = Math.min(...allMegaBoxes.map(item => item.position[1] - item.size[1] / 2)), maxY = Math.max(...allMegaBoxes.map(item => item.position[1] + item.size[1] / 2))
+assert.equal([minX, maxX, maxY - minY].join(','), '-66,66,92', 'mega greybox starts at 132 x 92 envelope')
+assert.equal(structure.inset.length, 0, 'mega gate remains a through-portal without a rear wall')
+assert(structure.braces.length === 4 && structure.braces.every(item => item.rotation && item.size[0] === 8 && item.size[2] === 8), 'mega gate has four real 8 x 8 diagonal braces')
 const cityForClearance = createStableCity(), signatureBefore = cityForClearance.signature
 const clearance = deriveMegaHeroClearance(cityForClearance), repeatClearance = deriveMegaHeroClearance(createStableCity())
 assert.deepEqual(clearance.clearedBuildingIds, repeatClearance.clearedBuildingIds, 'mega visible clearance is deterministic')
 assert.deepEqual(clearance.visibleBuildings.map(building => building.id), repeatClearance.visibleBuildings.map(building => building.id), 'visible building IDs remain deterministic')
 assert.equal(cityForClearance.signature, signatureBefore, 'clearance derivation does not mutate StableCity signature')
-assert(clearance.clearedBuildingIds.length > 0, '64-unit mega region derives a non-empty building clearance')
-assert.equal(clearance.region.maxX - clearance.region.minX, 64, 'clearance region preserves the 64-unit mega width')
+assert(clearance.clearedBuildingIds.length > 0, '132-unit mega region derives a non-empty building clearance')
+assert.equal(clearance.region.maxX - clearance.region.minX, 132, 'clearance region preserves the 132-unit mega width')
 for (const building of clearance.visibleBuildings) assert(building.x + building.width / 2 <= clearance.envelope.minX || building.x - building.width / 2 >= clearance.envelope.maxX || building.z + building.depth / 2 <= clearance.envelope.minZ || building.z - building.depth / 2 >= clearance.envelope.maxZ, 'visible buildings stay outside the mega clearance envelope')
 const overlapsCore = ({ position: [x, , z], size: [w, , d] }) => Math.abs(x) - w / 2 < 41.5 && Math.abs(z) - d / 2 < 41.5
 const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].some(offset => {

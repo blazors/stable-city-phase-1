@@ -8,40 +8,31 @@ export const megaStructureBounds = { width: megaConfig.dimensions.width, height:
 // Keep the roof layers physically separated. Interpenetrating thin slabs and
 // fins produce unstable depth/shadow results while orbiting close to the hero.
 export const megaRoofSupportTop = megaStructureBounds.height
-export const megaRoofFascia: MegaBox = { position: [0, megaRoofSupportTop + .2, 9], size: [64, .14, 18] }
-export const megaRoofDeck: MegaBox = { position: [0, megaRoofSupportTop + .45, 9], size: [60, .12, 16] }
-export const megaRoofRibY = megaRoofSupportTop + 2
-export const megaRoofRibHeight = 2.1
-
-const gateHeight = megaConfig.gate.height * megaConfig.gateHeightScale
-const gateDepth = megaConfig.gate.depth
-const gateBeamDepth = Math.min(megaConfig.beamDepth, gateDepth)
+export const megaRoofFascia: MegaBox = { position: [0, megaRoofSupportTop - 2, 18], size: [132, 4, 40] }
+export const megaRoofDeck: MegaBox = { position: [0, megaRoofSupportTop - 4.1, 18], size: [126, .12, 38] }
+export const megaRoofRibY = megaRoofSupportTop + 1
+export const megaRoofRibHeight = 1
 
 export const megaMainBodies: MegaBox[] = [
-  { position: [-27, 48, 9], size: [10, 96, 18] },
-  { position: [27, 48, 9], size: [10, 96, 18] },
-  { position: [0, 72, 9], size: [44, 14, 18] },
-  { position: [0, 90, 9], size: [44, 12, 18] },
+  { position: [-44, 40, 18], size: [22, 52, 36] },
+  { position: [44, 40, 18], size: [22, 52, 36] },
+  { position: [-51, 7, 18], size: [30, 14, 40] },
+  { position: [51, 7, 18], size: [30, 14, 40] },
+  { position: [0, 77, 18], size: [120, 22, 36] },
 ]
 
-export const megaGateInset: MegaBox[] = [
-  // The rear wall is deliberately deep in the portal. The front remains a
-  // negative-space opening so the hero camera reads a real tunnel, not a decal.
-  { position: [0, gateHeight / 2, gateDepth - .8], size: [megaConfig.portalWidth, gateHeight, .8] },
-  { position: [-megaConfig.portalWidth / 2, gateHeight / 2, gateDepth / 2], size: [.8, gateHeight + 8, gateDepth] },
-  { position: [megaConfig.portalWidth / 2, gateHeight / 2, gateDepth / 2], size: [.8, gateHeight + 8, gateDepth] },
-  { position: [0, gateHeight, gateDepth / 2], size: [megaConfig.portalWidth, .8, gateDepth] },
-  { position: [0, gateHeight - .45, gateBeamDepth / 2], size: [megaConfig.portalWidth + .8, .55, gateBeamDepth] },
-]
+// The opening is a true through-portal. Its side pillars and overhead beam are
+// structural bodies; no inset or rear wall may occupy the 66 x 66 x 36 void.
+export const megaGateInset: MegaBox[] = []
 
 export const megaMajorBraces: MegaBox[] = [
-  { position: [-23, 43, 1.2], size: [3.2, 58, .9], rotation: [0, 0, -.34] },
-  { position: [23, 43, 1.2], size: [3.2, 58, .9], rotation: [0, 0, .34] },
-  { position: [-27, 74, 1.2], size: [2.4, 38, .8], rotation: [0, 0, .36] },
-  { position: [27, 74, 1.2], size: [2.4, 38, .8], rotation: [0, 0, -.36] },
+  { position: [-44, 40, 2], size: [8, 52, 8], rotation: [0, 0, -.22] },
+  { position: [-44, 40, 34], size: [8, 52, 8], rotation: [0, 0, -.22] },
+  { position: [44, 40, 2], size: [8, 52, 8], rotation: [0, 0, .22] },
+  { position: [44, 40, 34], size: [8, 52, 8], rotation: [0, 0, .22] },
 ]
 export const megaDoorPillars = megaMainBodies.slice(0, 2)
-export const megaDoorBeam = megaMainBodies[2]
+export const megaDoorBeam = megaMainBodies[4]
 export const megaDeepEntrance = megaGateInset[0]
 
 type BridgeNode = Vec3
@@ -71,7 +62,7 @@ export function createMegaBridgeGeometry(): MegaBridgeGeometry {
     supports.push({ position: [x, megaConfig.bridgeHeight - .55, z], size: [width + 1, .7, 1.1] })
   }
   const last = megaConfig.bridgePath.at(-1)!
-  return { decks, rails, supports, platform: { position: [last[0], last[1], last[2] + 2.2], size: [width, .8, 4.4] } }
+  return { decks, rails, supports, platform: { position: [0, 15, 37], size: [12, .8, 14] } }
 }
 
 export function createMegaStructureGeometry() {
@@ -84,8 +75,28 @@ export function createMegaStructureGeometry() {
 
 export function createMegaRoofRibs(): MegaBox[] {
   const ribs: MegaBox[] = []
-  for (let x = -30; x <= 30; x += 2.4) ribs.push({ position: [x, megaRoofRibY, 9], size: [.32, megaRoofRibHeight, 16.5] })
+  for (let x = -48; x <= 48; x += 12) ribs.push({ position: [x, megaRoofRibY, 18], size: [1, megaRoofRibHeight, 36] })
   return ribs
+}
+
+export function intersectsMegaHeroFootprint(position: Vec3, size: Vec3, margin = 0) {
+  return position[0] - size[0] / 2 < megaHeroClearanceRegion.maxX + margin &&
+    position[0] + size[0] / 2 > megaHeroClearanceRegion.minX - margin &&
+    position[2] - size[2] / 2 < megaHeroClearanceRegion.maxZ + margin &&
+    position[2] + size[2] / 2 > megaHeroClearanceRegion.minZ - margin
+}
+
+export function intersectsMegaBridgeCorridor(position: Vec3, size: Vec3, margin = 3) {
+  const radius = Math.max(size[0], size[2]) / 2 + margin
+  for (let i = 0; i < megaConfig.bridgePath.length - 1; i++) {
+    const from = megaConfig.bridgePath[i], to = megaConfig.bridgePath[i + 1]
+    const dx = to[0] - from[0], dz = to[2] - from[2]
+    const lengthSquared = dx * dx + dz * dz
+    const t = Math.max(0, Math.min(1, ((position[0] - from[0]) * dx + (position[2] - from[2]) * dz) / lengthSquared))
+    const nearestX = from[0] + t * dx, nearestZ = from[2] + t * dz
+    if (Math.hypot(position[0] - nearestX, position[2] - nearestZ) <= radius) return true
+  }
+  return false
 }
 
 export type MegaClearanceRegion = { minX: number; maxX: number; minZ: number; maxZ: number }
@@ -110,7 +121,7 @@ const overlapsClearance = (building: StableBuilding, region: MegaClearanceRegion
 
 /** Rendering-only clearance; StableCity data and its signature remain unchanged. */
 export function deriveMegaHeroClearance(city: StableCityLike) {
-  const clearedBuildingIds = city.buildings.filter(building => overlapsClearance(building, megaHeroClearanceEnvelope)).map(building => building.id)
+  const clearedBuildingIds = city.buildings.filter(building => overlapsClearance(building, megaHeroClearanceEnvelope) || intersectsMegaBridgeCorridor([building.x, 0, building.z], [building.width, 1, building.depth])).map(building => building.id)
   const cleared = new Set(clearedBuildingIds)
   return { region: megaHeroClearanceRegion, envelope: megaHeroClearanceEnvelope, clearedBuildingIds, visibleBuildings: city.buildings.filter(building => !cleared.has(building.id)) }
 }

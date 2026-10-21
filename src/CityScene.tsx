@@ -13,7 +13,7 @@ import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaBridgeGeometry, createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, megaRoofDeck, megaRoofFascia } from './megaGeometry'
+import { createMegaBridgeGeometry, createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, intersectsMegaBridgeCorridor, intersectsMegaHeroFootprint, megaRoofDeck, megaRoofFascia } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
@@ -172,8 +172,6 @@ function MegaPracticalHalo({ accent, time, quality, intensity = 1 }: { accent: s
 }
 
 function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { accent: string; theme: ThemeName | null; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay; mood?: ResolvedMood }) {
-  const rotor = useRef<Group>(null)
-  useFrame((_, delta) => { if (rotor.current) rotor.current.rotation.y += delta * .13 })
   const structure = useMemo(() => createMegaStructureGeometry(), [])
   const ribs = useMemo(() => createMegaRoofRibs(), [])
   const bridge = useMemo(() => createMegaBridgeGeometry(), [])
@@ -184,22 +182,18 @@ function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { 
     ]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={[...structure.braces, ...ribs]} />
     <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
-      ...structure.inset, megaRoofDeck,
+      ...structure.inset, megaRoofDeck, megaRoofFascia,
     ]} />
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, bridge.platform]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
     <Boxes color={accent} emissive={accent} glow night={night} items={bridge.rails} />
     <Boxes color={accent} emissive={accent} glow night={night} items={[
-      megaRoofFascia,
+      { position: [0, 88.05, 18], size: [132, .08, .15] },
       ...megaPracticalPositions.map(position => ({ position, size: [.12, 17, .15] as Vec3 })),
-      { position: [0, 65.5, .8], size: [36, .16, .16] },
+      { position: [0, 65.5, .8], size: [66, .16, .16] },
     ]} />
     {(night || (mood?.lightLevel ?? 0) > .65) && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28 * (.35 + (mood?.lightLevel ?? .65))} distance={16} decay={2} />)}
     <MegaPracticalHalo accent={accent} time={sunset ? 'sunset' : time} quality={quality} intensity={.5 + (mood?.lightLevel ?? .55)} />
-    <group position={[0, 99.2, 9]} ref={rotor}>
-      <mesh rotation-x={Math.PI / 2} castShadow><torusGeometry args={[2.7, .17, 8, 40]} /><meshStandardMaterial color={accent} roughness={.5} metalness={.4} /></mesh>
-      <Boxes color={accent} items={[{ position: [0, 0, 0], size: [5.5, .18, .18] }, { position: [0, 0, 0], size: [.18, .18, 5.5] }]} />
-    </group>
   </>
 }
 
@@ -393,11 +387,12 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
   }, [theme])
   const land = themed?.land ?? metropolis.land, parks = themed?.parks ?? metropolis.parks
   const paths = themed?.paths ?? metropolis.paths
-  const visibleBodies = themed?.visibleBodies ?? metropolis.visibleBodies
-  const upperMasses = themed?.upperMasses ?? metropolis.upperMasses
-  const facadePanels = themed?.facadePanels ?? metropolis.facadePanels
-  const roofs = themed?.roofs ?? metropolis.roofs, allTerraces = themed?.terraces ?? metropolis.terraces
-  const allTrees = themed?.trees ?? metropolis.trees
+  const intersectsMega = (item: Box) => intersectsMegaHeroFootprint(item.position, item.size, 1) || intersectsMegaBridgeCorridor(item.position, item.size, 1)
+  const visibleBodies = (themed?.visibleBodies ?? metropolis.visibleBodies).filter(item => !intersectsMega(item))
+  const upperMasses = (themed?.upperMasses ?? metropolis.upperMasses).filter(item => !intersectsMega(item))
+  const facadePanels = (themed?.facadePanels ?? metropolis.facadePanels).filter(item => !intersectsMega(item))
+  const roofs = (themed?.roofs ?? metropolis.roofs).filter(item => !intersectsMega(item)), allTerraces = (themed?.terraces ?? metropolis.terraces).filter(item => !intersectsMega(item))
+  const allTrees = (themed?.trees ?? metropolis.trees).filter(item => !intersectsMega(item))
   const parkClearTrees = allTrees.filter(tree => !metropolis.publicSpaceTreeClearance.some(bound =>
     Math.abs(tree.position[0] - bound.position[0]) < (tree.size[0] + bound.size[0]) / 2 &&
     Math.abs(tree.position[2] - bound.position[2]) < (tree.size[2] + bound.size[2]) / 2,
