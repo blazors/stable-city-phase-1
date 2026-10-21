@@ -13,4 +13,11 @@ const quality = app.split("{view === 'quality' && <section")[1]?.split("<section
 if (!quality.includes('aria-label="质量环境"') || !quality.includes('<WeatherPicker')) {
   throw new Error('Quality must retain explicit environment controls for fixed-condition review')
 }
+const visualNav = app.split('<span>视觉 · VISUAL</span>')[1]?.split('<span>系统 · SYSTEM</span>')[0] ?? ''
+if (visualNav.includes('资产 · Assets') || visualNav.includes('质量 · Quality') || !visualNav.includes('总览 · Overview')) {
+  throw new Error('Public visual navigation must expose only Overview')
+}
+if (!app.includes("persistedUi?.view === 'assets' || persistedUi?.view === 'quality' ? 'overview'")) {
+  throw new Error('Hidden legacy visual views must migrate back to Overview')
+}
 console.log('Mood V1 source contract: PASS')
