@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
@@ -36,6 +36,7 @@ export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
 type Box = { position: Vec3; size: Vec3; color?: string; tower?: boolean }
 export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number; sampleDurationMs: number; configRevision: number }
+export type SceneCanvasHandle = { capture: () => Promise<{ blob: Blob; width: number; height: number }>; camera: () => { position: [number, number, number]; target: [number, number, number]; fov: number } }
 type CanvasMetrics = Omit<RenderMetrics, 'configRevision'>
 export type QualityPreset = 'auto' | 'high' | 'balanced' | 'low'
 export const waterWaveBudgets: Record<QualityPreset, number> = { auto: 3, high: 3, balanced: 2, low: 1 }
@@ -533,16 +534,17 @@ function WebGLGuard({ onError }: { onError?: (message: string) => void }) {
   return null
 }
 
-export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', benchmark = false, mood: moodProp, onUpdate, onReady, onError }: {
+export function Scene({ time, mode, theme, enabled, weather = 'clear', quality = 'auto', benchmark = false, mood: moodProp, onUpdate, onReady, onError, onCanvasReady }: {
   time: TimeOfDay; mode: 'overview' | 'mega'; theme: ThemeName; enabled: boolean
   weather?: Weather
   quality?: QualityPreset
   mood?: ResolvedMood
   benchmark?: boolean
-  onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void
+  onUpdate: (metrics: CanvasMetrics) => void; onReady: (ms: number) => void; onError?: (message: string) => void; onCanvasReady?: (handle: SceneCanvasHandle | null) => void
 }) {
   benchmark = benchmark || new URLSearchParams(window.location.search).get('view') === 'quality'
   const startedAt = useRef(performance.now())
+  const controls = useRef<ComponentRef<typeof OrbitControls>>(null)
   const mood = moodProp
   const effectiveWeather = mood && mood.wetnessLevel > .72 && weather === 'clear' ? 'rain' : weather
   const p = applyMoodPalette(environmentPalette(time, effectiveWeather), mood), night = time === 'night', config = qualityConfig[quality]
@@ -552,10 +554,19 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
   const sceneCamera = useMemo(() => createSceneCamera(mode), [mode])
   return <Canvas
     camera={sceneCamera}
-    onCreated={({ camera, size }) => {
+    onCreated={({ camera, size, gl, scene }) => {
       camera.position.set(...cameraPosition(mode, size.width / size.height))
       camera.lookAt(...cameraViews[mode].target)
       camera.updateProjectionMatrix()
+      onCanvasReady?.({
+        camera: () => ({ position: camera.position.toArray() as [number, number, number], target: (controls.current?.target.toArray() ?? cameraViews[mode].target) as [number, number, number], fov: 'fov' in camera ? camera.fov : 45 }),
+        capture: async () => {
+          gl.render(scene, camera)
+          const blob = await new Promise<Blob | null>(resolve => gl.domElement.toBlob(resolve, 'image/png'))
+          if (!blob || blob.size === 0) throw new Error('Canvas 未生成有效 PNG')
+          return { blob, width: gl.domElement.width, height: gl.domElement.height }
+        },
+      })
     }}
     shadows
     dpr={benchmark ? 1 : renderQualityBudgets[quality].dpr}
@@ -575,7 +586,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
     {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure accent={enabled ? themeSpecs[theme].emission : '#b1a286'} theme={enabled ? theme : null} night={night} sunset={time === 'sunset'} time={time} quality={quality} mood={mood} /><Transport night={night} count={config.traffic} />
-    <OrbitControls key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
+    <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
     {(effectiveWeather === 'haze' || (mood?.fogLevel ?? 0) > .2) && <HeightFog color={fog.color} mode={mode} quality={quality} densityScale={Math.max(.2, (mood?.fogLevel ?? .62) / .62)} />}

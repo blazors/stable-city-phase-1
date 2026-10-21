@@ -47,6 +47,13 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 
 ## 当前运行基线
 
+### 画面记录 Snapshot V1（2026-10-21）
+
+- Overview 提供轻量“记录此画面 / 查看记录”入口；V1 记录 Three/R3F 场景基础渲染（不含 DOM 界面及镜头后处理），下载 PNG 与同一 `snapshotId` 的 JSON sidecar，不把 PNG/base64 写入 localStorage。
+- 浏览器只保存经过 allowlist 清理的最近 metadata；记录包含版本化 schema、CitySeed/StableCity、Theme/Mood、时间天气、相机、质量/viewport、真实 local-rule 执行事实、提示词字段、性能指标和恢复限制。当前未接 Provider 的字段为 `none`、`null`、`0` 或 `local-rule`，不伪造 API 响应。
+- 恢复支持主题、氛围、时段、天气、镜头模式和质量；相机位置/target/fov 记录用于证据，但当前恢复动作不宣称完整相机恢复。截图失败不下载空 PNG，也不写入记录。
+- 仅完成代码级与构建验证；未宣称真实浏览器视觉验收通过。仍需主代理在真实浏览器确认截图文件、JSON sidecar、恢复交互和无 UI 像素。
+
 - Stage 6 验收环境：1280×720、DPR 1、本机内置浏览器。
 - 代表性样本约 59–61 FPS、16.3–17.0 ms。`frameMs` 是 Canvas 采样节拍，draw calls / triangles 是最近渲染帧计数，不是 GPU 时间或跨设备保证。
 - Overview 夜雨：HIGH 87 draws / 208,324 tris；LOW 55 / 75,180。
