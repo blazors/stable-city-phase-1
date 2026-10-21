@@ -24,4 +24,8 @@ const systemNav = app.split('<span>系统 · SYSTEM</span>')[1]?.split('</nav>')
 if (systemNav.includes('调试 · Debug') || !systemNav.includes('流程 · Pipeline')) {
   throw new Error('Public system navigation must hide Debug and retain Pipeline')
 }
+const pipeline = app.split('<section className={`surface-page system-page pipeline-page')[1]?.split("{view === 'cost'")[0] ?? ''
+if (!pipeline.includes('<ProductionPanel') || pipeline.includes('className="timeline"') || pipeline.includes('className="pipeline-facts"')) {
+  throw new Error('Pipeline must keep ProductionPanel and omit static timeline/run facts')
+}
 console.log('Mood V1 source contract: PASS')

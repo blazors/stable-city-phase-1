@@ -39,6 +39,12 @@ Art-First 3D Web City 以确定性 `StableCity` 为底座，通过主题、天�
 | 自动浏览器回归 | 阻断 | 现有源码、构建和人工浏览器验收可继续 | 引入 Playwright 等新依赖前需 ChangeRequest |
 | 外部 AI/API | 延后 | Provider 状态与成本均如实显示为未接入、$0 | API 凭据、预算与批准流程确认后再做 |
 
+### Pipeline 页面收敛（2026-10-21）
+
+- Pipeline 只保留 ProductionPanel：本地制作要求拆分、请求通道选择、ThemeSpec 候选确认、任务运行、人工审核/退回、完成留档、浏览器本地草稿和运行记录导出均为真实可操作能力。
+- 移除页面中的静态 Timeline、Stage Status、Duration、Retry、Blocker 和 Decision gate 摘要；这些字段没有独立数据源，容易把 Canvas 状态、Provider 状态或固定的 `0` 误读为真实流程运行结果。
+- Pipeline 仍作为普通 SYSTEM 导航入口，因为 ProductionPanel 具有独立价值；Overview 的自然语言 Mood 生成不重复迁移到 Pipeline。Provider 继续明确标记为未接入，不声称已有外部执行。
+
 ## 当前运行基线
 
 - Stage 6 验收环境：1280×720、DPR 1、本机内置浏览器。
