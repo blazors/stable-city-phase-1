@@ -20,4 +20,8 @@ if (visualNav.includes('资产 · Assets') || visualNav.includes('质量 · Qual
 if (!app.includes("persistedUi?.view === 'assets' || persistedUi?.view === 'quality' ? 'overview'")) {
   throw new Error('Hidden legacy visual views must migrate back to Overview')
 }
+const systemNav = app.split('<span>系统 · SYSTEM</span>')[1]?.split('</nav>')[0] ?? ''
+if (systemNav.includes('调试 · Debug') || !systemNav.includes('流程 · Pipeline')) {
+  throw new Error('Public system navigation must hide Debug and retain Pipeline')
+}
 console.log('Mood V1 source contract: PASS')
