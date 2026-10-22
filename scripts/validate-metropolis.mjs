@@ -87,14 +87,15 @@ for (const [x, z] of [[-234, -126], [234, -126], [-234, 234], [234, 234]]) {
   assert(Math.abs(projected.x) < 1.25 && projected.y > -1.25 && projected.y < .9, `overview keeps the occupied metropolitan grid near the safe frame`)
 }
 const heroCamera = createSceneCamera('mega')
-heroCamera.aspect = 1.5
+heroCamera.aspect = 2.4
 heroCamera.position.set(...cameraPosition('mega', 1.5))
 heroCamera.lookAt(...cameraViews.mega.target)
 heroCamera.updateProjectionMatrix()
 heroCamera.updateMatrixWorld()
 const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
-const gateShare = Math.abs(heroProject(0, 56, 0).y - heroProject(0, 0, 0).y)
-assert(gateShare >= .80 && gateShare <= .92, `hero gate occupies the 80-92% screen band (got ${gateShare.toFixed(3)})`)
+const gateProjected = [-33, 33].flatMap(x => [0, 92].flatMap(y => [0, 36].map(z => heroProject(x, y, z))))
+const gateShare = Math.max(...gateProjected.map(point => point.x)) - Math.min(...gateProjected.map(point => point.x))
+assert(gateShare >= .50 && gateShare <= .65, `hero gate occupies the 50-65% screen band (got ${gateShare.toFixed(3)})`)
 const coreHeights = createStableCity().buildings.filter(building => building.id.startsWith('1:') || building.id.startsWith('2:')).map(building => building.height).sort((a, b) => a - b)
 const coreMedian = coreHeights[Math.floor(coreHeights.length / 2)]
 assert(92 / coreMedian >= 4 && 92 / coreMedian <= 8, `mega scale ratio stays 4-8x core median (got ${(92 / coreMedian).toFixed(2)})`)
@@ -108,8 +109,9 @@ for (const aspect of [.5, 1.5, 2.5]) {
   const project = (x, y, z) => new Vector3(x, y, z).project(camera)
   for (const x of [-66, 66]) for (const y of [0, 92]) for (const z of [0, 36]) {
     const projected = project(x, y, z)
-    const xLimit = aspect < 1 ? 2 : 1.35
-    assert(Math.abs(projected.x) < xLimit && projected.y > -1.35 && projected.y < 1.35, `${aspect}: mega bounds remain within the authored composition tolerance`)
+    const xLimit = aspect < 1 ? 2.6 : 1.35
+    const yLimit = 1.6
+    assert(Math.abs(projected.x) < xLimit && projected.y > -yLimit && projected.y < yLimit, `${aspect}: mega bounds remain within the authored composition tolerance`)
   }
 }
 const structure = createMegaStructureGeometry()

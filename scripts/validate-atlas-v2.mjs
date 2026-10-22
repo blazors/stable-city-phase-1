@@ -51,7 +51,30 @@ for (let i = 0; i < config.bridgePath.length - 1; i++) {
 }
 
 const elevatedCamera = camera.createSceneCamera('elevated')
-assert.deepEqual(camera.cameraViews.hero, { position: [-48, 6, -142], target: [0, 42, 14], fov: 46 }, 'Hero camera matches authored composition')
+assert.deepEqual(camera.cameraViews.hero, { position: [-24, 3.5, -115], target: [0, 38, 16], fov: 50 }, 'Hero camera matches authored low street composition')
+const heroCamera = camera.createSceneCamera('hero')
+heroCamera.aspect = 2.4
+heroCamera.position.set(...camera.cameraPosition('hero', heroCamera.aspect))
+heroCamera.lookAt(...camera.cameraViews.hero.target)
+heroCamera.updateProjectionMatrix()
+heroCamera.updateMatrixWorld()
+const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
+const heroElevation = Math.atan2(camera.cameraViews.hero.target[1] - camera.cameraViews.hero.position[1], Math.hypot(camera.cameraViews.hero.position[0] - camera.cameraViews.hero.target[0], camera.cameraViews.hero.position[2] - camera.cameraViews.hero.target[2])) * 180 / Math.PI
+assert(camera.cameraViews.hero.position[1] >= 3 && camera.cameraViews.hero.position[1] <= 10, 'hero camera remains in the low street-level height band')
+assert(heroElevation >= 8 && heroElevation <= 15, `hero camera keeps the authored 8-15 degree elevation (got ${heroElevation.toFixed(2)})`)
+const gateProjected = [-config.portalWidth / 2, config.portalWidth / 2].flatMap(x => [0, config.dimensions.height].flatMap(y => [config.frontZ, config.frontZ + config.gate.depth].map(z => heroProject(x, y, z))))
+const gateScreenShare = Math.max(...gateProjected.map(point => point.x)) - Math.min(...gateProjected.map(point => point.x))
+assert(gateScreenShare >= .50 && gateScreenShare <= .65, `hero gate width stays in the 50-65% screen band (got ${gateScreenShare.toFixed(3)})`)
+const gateScreenHeight = (Math.max(...gateProjected.map(point => point.y)) - Math.min(...gateProjected.map(point => point.y))) / 2
+assert(gateScreenHeight >= .65 && gateScreenHeight <= .80, `hero gate height stays in the 65-80% screen band (got ${gateScreenHeight.toFixed(3)})`)
+assert(Math.max(...gateProjected.map(point => point.y)) < 1 && Math.min(...gateProjected.map(point => point.y)) > -1, 'hero gate remains fully inside the frame with sky and ground margins')
+for (const [x, y, z] of config.bridgePath) {
+  const projected = heroProject(x, y + .5, z)
+  assert(!(projected.x < -.25 && projected.y < -.45), 'hero bridge stays out of the lower-left scene-caption safe zone')
+}
+for (const [x, , z] of config.bridgePath) {
+  if (z > config.frontZ && z < config.frontZ + config.gate.depth) assert(Math.abs(x) < config.portalWidth / 2 - 3, 'bridge keeps its 6-unit deck clear of portal pillars')
+}
 assert.deepEqual(camera.cameraViews.elevated, { position: [-125, 63, -155], target: [0, 37, 18], fov: 46 }, 'Elevated camera matches authored composition')
 elevatedCamera.aspect = 1280 / 720
 elevatedCamera.position.set(...camera.cameraPosition('elevated', elevatedCamera.aspect))

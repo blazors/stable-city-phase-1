@@ -2,15 +2,15 @@ export type Vec3 = [number, number, number]
 
 const cameraPreset = {
   overview: { position: [-270, 155, -305] as Vec3, target: [0, 28, 45] as Vec3, fov: 46 },
-  hero: { position: [-48, 6, -142] as Vec3, target: [0, 42, 14] as Vec3, fov: 46 },
+  hero: { position: [-24, 3.5, -115] as Vec3, target: [0, 38, 16] as Vec3, fov: 50 },
   elevated: { position: [-125, 63, -155] as Vec3, target: [0, 37, 18] as Vec3, fov: 46 },
 } as const
 
 export const sceneConfig = {
   camera: {
     cameraPreset,
-    heroCameraTarget: [0, 42, 14] as Vec3,
-    heroCameraFov: 46,
+    heroCameraTarget: [0, 38, 16] as Vec3,
+    heroCameraFov: 50,
   },
   mega: {
     dimensions: { width: 132, height: 92, depth: 36 },
@@ -20,7 +20,7 @@ export const sceneConfig = {
     gateHeightScale: 1,
     beamDepth: 36,
     portalWidth: 66,
-    bridgePath: [[-60, 15, -56], [-45, 15, -34], [-20, 15, -18], [0, 15, -8], [0, 15, 28], [0, 15, 42]] as Vec3[],
+    bridgePath: [[60, 15, -56], [45, 15, -34], [20, 15, -18], [0, 15, -8], [0, 15, 28], [0, 15, 42]] as Vec3[],
     bridgeHeight: 15,
     clearance: { width: 132, depth: 36, margin: 2 },
   },
