@@ -86,7 +86,7 @@ const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 
 assert.match(scene, /renderQualityBudgets: Record<QualityPreset, \{ dpr: \[number, number\]; shadowMapSize: number \}> = \{\s*auto: \{ dpr: \[1, 1\.5\], shadowMapSize: 1024 \},\s*high: \{ dpr: \[1, 2\], shadowMapSize: 2048 \},\s*balanced: \{ dpr: \[1, 1\.25\], shadowMapSize: 1024 \},\s*low: \{ dpr: \[1, 1\], shadowMapSize: 512 \},\s*\}/, 'DPR and shadow map resolution follow explicit per-quality budgets')
 assert.match(scene, /dpr=\{benchmark \? 1 : renderQualityBudgets\[quality\]\.dpr\}/, 'acceptance fixes DPR while ordinary Canvas follows the selected quality tier')
 assert.match(scene, /shadow-mapSize=\{\[renderQualityBudgets\[quality\]\.shadowMapSize, renderQualityBudgets\[quality\]\.shadowMapSize\]\}/, 'sun shadow resolution follows the selected quality tier')
-assert.match(scene, /snowCaps\(\[megaRoofDeck, \.\.\.createMegaRoofRibs\(\)\]\)/, 'snow follows the separate hero roof ribs')
+assert.match(scene, /snowCaps\(\[megaRoofDeck\]\)/, 'snow maps directly to the shared top Hero roof deck')
 assert.match(scene, /count=\{snowBudgets\[quality\]\}/, 'all qualities retain snow identity')
 assert.match(scene, /function SnowSurfaces[\s\S]*?<planeGeometry \/>/, 'snow cover uses a low-triangle instanced plane batch')
 assert.match(scene, /puddleBudgets\[quality\]/, 'rain puddles follow the active quality budget')
@@ -115,7 +115,7 @@ assert.match(scene, /float distanceFade=1\.0-smoothstep\(120\.0,620\.0,distance\
 assert.match(scene, /float dynamicRiver=\(1\.0-freeze\*\.98\)/, 'snow suppresses dynamic river waves and glints only in the channel')
 assert.match(scene, /function MegaPracticalHalo[\s\S]*?instancedMesh[\s\S]*?depthTest depthWrite=\{false\}/, 'mega practical halo is one depth-tested local batch')
 assert.match(scene, /if \(time === 'day' \|\| quality === 'low'\) return null/, 'day and LOW disable the local practical halo')
-assert.match(scene, /<Atmosphere time=\{time\} weather=\{weather\} lowDetail=\{quality === 'low'\} quality=\{quality\} \/>/, 'atmosphere receives the active quality tier')
+assert.match(scene, /<Atmosphere time=\{time\} weather=\{effectiveWeather\} lowDetail=\{quality === 'low'\} quality=\{quality\} mood=\{mood\} \/>/, 'atmosphere receives the effective weather and active quality tier')
 assert.match(scene, /validFrames: current\.frames/, 'metrics expose the valid sample count')
 assert.match(scene, /Visible stalls belong to the user-perceived cadence/, 'visible stalls remain part of Canvas cadence')
 assert.match(scene, /document\.addEventListener\('visibilitychange', handleVisibility\)/, 'metrics reset stale windows when the page becomes hidden')
@@ -214,7 +214,7 @@ assert.match(lens, /if\(uDetail>2\.5\)ice=/, 'high snow enables four-direction l
 assert.match(lens, /else ice=/, 'auto and balanced snow use the two-sample path')
 assert.match(lens, /gl_FragColor=vec4\(color,[\s\S]*#include <colorspace_fragment>/, 'direct overlay keeps its output color conversion')
 assert.doesNotMatch(lens.match(/const postFragmentShader = `[\s\S]*?`\n\nconst lensShader/)?.[0] ?? '', /colorspace_fragment/, 'post-process pass leaves color conversion to OutputPass')
-assert.match(scene, /<LensWeather time=\{time\} weather=\{weather\} quality=\{quality\} mode=\{mode\} \/>/, 'both scene modes share lens integration')
+assert.match(scene, /<LensWeather time=\{time\} weather=\{effectiveWeather\} quality=\{quality\} mode=\{mode\} \/>/, 'both scene modes share lens integration using effective weather')
 const loadPureModule = async file => {
   const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText

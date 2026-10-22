@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 const checks = [
-  ['P0 scene config centralizes authored cameras and mega dimensions', /cameraPreset = \{[\s\S]*hero: \{ position: \[-24, 3\.5, -115\].*target: \[0, 38, 16\].*fov: 50[\s\S]*elevated: \{ position: \[-125, 63, -155\].*target: \[0, 37, 18\].*fov: 46[\s\S]*width: 132, height: 92, depth: 36[\s\S]*gateHeightScale: 1[\s\S]*portalWidth: 66[\s\S]*bridgePath[\s\S]*bridgeHeight/, 'src/sceneConfig.ts'],
+  ['P0 scene config centralizes authored cameras and mega dimensions', /cameraPreset = \{[\s\S]*hero: \{ position: \[-68, 14, -196\].*target: \[-6, 62, 20\].*fov: 44[\s\S]*elevated: \{ position: \[-125, 63, -155\].*target: \[0, 37, 18\].*fov: 46[\s\S]*width: 140, height: 124, depth: 50[\s\S]*gateHeightScale: 1[\s\S]*portalWidth: 64[\s\S]*bridgePath[\s\S]*bridgeHeight/, 'src/sceneConfig.ts'],
   ['P0 camera keeps the legacy mega mode mapped to the authored Hero preset and adds 3Q Elevated', /heroCameraPreset = \{[\s\S]*mega: heroCameraPreset[\s\S]*elevated: cameraConfig\.cameraPreset\.elevated/, 'src/camera.ts'],
   ['P0 mega greybox exposes beams, inset and braces', /export const megaMajorBraces[\s\S]*export const megaDoorPillars[\s\S]*export const megaDoorBeam[\s\S]*export const megaDeepEntrance/, 'src/megaGeometry.ts'],
-  ['P0 mega gate is a through-portal with a supported bridge', /true through-portal[\s\S]*megaGateInset: MegaBox\[\] = \[\][\s\S]*createMegaBridgeGeometry[\s\S]*Three grounded piers/, 'src/megaGeometry.ts'],
+  ['P0 mega gate is a through-portal with a grounded, turn-supported bridge', /true through-portal[\s\S]*megaGateInset: MegaBox\[\] = \[\][\s\S]*createMegaBridgeGeometry[\s\S]*const piers = \[\s*\.\.\.path\.slice\(0, 4\)/, 'src/megaGeometry.ts'],
   ['P0 clearance is rendering-only and deterministic', /deriveMegaHeroClearance[\s\S]*clearedBuildingIds[\s\S]*visibleBuildings/, 'src/megaGeometry.ts'],
   ['P0 shadow camera covers the 96-unit hero without covering the whole city', /shadow-camera-left=\{-70\} shadow-camera-right=\{70\} shadow-camera-top=\{110\} shadow-camera-bottom=\{-25\}/, 'src/CityScene.tsx'],
   ['StableCity block contract', /city\.blocks\.length !== 16/, 'src/city.ts'],
@@ -25,7 +25,7 @@ const checks = [
   ['Stage 18 public-space structures share one LOW-visible Boxes batch and filter overlapping park trees', /const parkClearTrees = allTrees\.filter\(tree => !metropolis\.publicSpaceTreeClearance\.some[\s\S]*?<Boxes items=\{metropolis\.publicSpaceStructures\} roughness=\{\.78\} metalness=\{\.03\}/, 'src/CityScene.tsx'],
   ['Stage 18 adds only a night-only low-emission instanced light batch', /night && <Boxes items=\{metropolis\.publicSpaceLights\} color="#ffffff" emissive="#6b482d" glow night emissiveIntensity=\{\.22\} \/>/, 'src/CityScene.tsx'],
   ['Stage 19 mounts the complete signature overlay only when Theme is enabled', /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'src/CityScene.tsx'],
-  ['Stage 19 signatures merge public-space and Hero attachments into one body batch plus night accents', /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'src/CityScene.tsx'],
+  ['Stage 19 hides Hero-slot theme decorations while preserving shared non-shadowing batches', /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?filter\(item => item\.slot !== 'hero'\)[\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\.filter\(item => item\.slot !== 'hero'\)\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'src/CityScene.tsx'],
   ['Stage 19 signatures remain independent of city generators and random streams', /export function buildThemeSignature\(theme: ThemeName \| null\)[\s\S]*?if \(!theme\) return \{ bodies: \[\], accents: \[\], attachments: \[\] \}/, 'src/themeSignature.ts'],
   ['P0 Hero attachments derive from the new mega anchor', /const heroAnchor = \{ y: megaConfig\.gate\.height, z: megaConfig\.frontZ \+ megaConfig\.dimensions\.depth \/ 2 \}[\s\S]*?for \(const side of \[-1, 1\]\)[\s\S]*?heroAnchor\.y[\s\S]*?heroAnchor\.z/, 'src/themeSignature.ts'],
   ['Stage 18 snow covers only explicit pavilion roof and platform surfaces', /snowCaps\(metropolis\.publicSpaceSnowSurfaces\)/, 'src/CityScene.tsx'],
@@ -77,6 +77,7 @@ const checks = [
   ['Aperture leaves a wide transparent hero region', /\.scene-aperture::before \{[^}]*transparent 0 58%/, 'src/style.css'],
   ['Night aperture is lighter than the daytime edge falloff', /\.scene-aperture\.aperture-night \{ opacity: \.1; \}/, 'src/style.css'],
   ['Overview and Quality share canvas grading', /\.visual-stage canvas, \.quality-stage canvas \{[^}]*filter: saturate\(var\(--scene-saturation\)\) contrast\(var\(--scene-contrast\)\)/, 'src/style.css'],
+  ['Fixed Hero frame keeps its caption in the lower-left title-safe area', /:has\(\[data-hero-aspect="fixed"\]\) \.scene-caption[^}]*left: calc\([^}]*right: auto;[^}]*text-align: left;/, 'src/style.css'],
 ]
 
 const failures = checks.flatMap(([label, pattern, file]) => pattern.test(read(file)) ? [] : [`${label} failed (${file})`])

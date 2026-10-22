@@ -13,7 +13,7 @@ import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
 import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaBridgeGeometry, createMegaRoofRibs, createMegaStructureGeometry, deriveMegaHeroClearance, intersectsMegaBridgeCorridor, intersectsMegaHeroFootprint, megaRoofDeck, megaRoofFascia } from './megaGeometry'
+import { createMegaBridgeGeometry, createMegaStructureGeometry, deriveMegaHeroClearance, intersectsMegaBridgeCorridor, intersectsMegaHeroFootprint, megaRoofDeck } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
@@ -26,7 +26,7 @@ const snowSurfaces = [
   ...snowCaps(megaClearance.visibleBuildings.map(b => ({ position: [b.x, b.height + .7, b.z] as Vec3, size: [b.width * .57, 1.1, b.depth * .58] as Vec3 }))),
   ...snowCaps(metropolis.roofs), ...snowCaps(metropolis.parks), ...snowCaps(metropolis.publicSpaceSnowSurfaces),
   ...snowRoadEdges(metropolis.roads),
-  ...snowCaps([megaRoofDeck, ...createMegaRoofRibs()]),
+  ...snowCaps([megaRoofDeck]),
   ...snowCaps(city.blocks.filter(b => b.kind === 'void').map(b => ({ position: [b.x, .12, b.z] as Vec3, size: [14, .24, 14] as Vec3 }))),
   ...snowRoadEdges([-36, -18, 0, 18, 36].flatMap(v => [
     { position: [v, .025, 0] as Vec3, size: [v === 0 ? 4.6 : 3, .05, 78] as Vec3 },
@@ -173,16 +173,15 @@ function MegaPracticalHalo({ accent, time, quality, intensity = 1 }: { accent: s
 
 function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { accent: string; theme: ThemeName | null; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay; mood?: ResolvedMood }) {
   const structure = useMemo(() => createMegaStructureGeometry(), [])
-  const ribs = useMemo(() => createMegaRoofRibs(), [])
   const bridge = useMemo(() => createMegaBridgeGeometry(), [])
   const spec = theme ? themeSpecs[theme] : null
   return <>
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} items={[
       ...structure.bodies,
     ]} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={[...structure.braces, ...ribs]} />
+    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={structure.braces} />
     <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
-      ...structure.inset, megaRoofDeck, megaRoofFascia,
+      ...structure.inset,
     ]} />
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, bridge.platform]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
@@ -432,11 +431,11 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
 
 function ThemeSignatureOverlay({ theme, night }: { theme: ThemeName; night: boolean }) {
   const signature = useMemo(() => buildThemeSignature(theme), [theme])
-  const bodies = useMemo(() => [...signature.bodies, ...signature.attachments], [signature])
+  const bodies = useMemo(() => [...signature.bodies, ...signature.attachments].filter(item => item.slot !== 'hero'), [signature])
   const spec = themeSpecs[theme]
   return <>
     <Boxes items={bodies} roughness={.78} metalness={.04} castShadow={false} receiveShadow={false} />
-    {night && <Boxes items={signature.accents} color="#ffffff" glow night emissive={spec.emission} emissiveIntensity={.18} castShadow={false} receiveShadow={false} />}
+    {night && <Boxes items={signature.accents.filter(item => item.slot !== 'hero')} color="#ffffff" glow night emissive={spec.emission} emissiveIntensity={.18} castShadow={false} receiveShadow={false} />}
   </>
 }
 
@@ -560,9 +559,10 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
       })
     }}
     shadows
+    data-hero-aspect={mode === 'mega' ? 'fixed' : 'fluid'}
     dpr={benchmark ? 1 : renderQualityBudgets[quality].dpr}
     gl={{ antialias: true }}
-    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+    style={mode === 'mega' ? { position: 'relative', width: 'min(100%, 177.7778cqh)', height: 'auto', aspectRatio: '16 / 9' } : { position: 'absolute', inset: 0, width: '100%', height: '100%' }}
     fallback={<div className="scene-fallback" role="alert"><strong>3D 场景暂不可用</strong><small>请降低渲染质量或刷新页面。</small></div>}
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />

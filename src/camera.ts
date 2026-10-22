@@ -13,8 +13,9 @@ export const cameraViews = {
 }
 export const overviewDistanceOffset = () => Math.max(0, Math.hypot(...cameraViews.overview.position.map((value, axis) => value - cameraViews.overview.target[axis])) - 420)
 
-export function cameraPosition(mode: CameraMode, aspect: number): Vec3 {
+export function cameraPosition(mode: CameraMode | 'hero', aspect: number): Vec3 {
   const { position, target } = cameraViews[mode]
+  if (mode === 'mega' || mode === 'hero') return position
   const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1
   const fit = Math.max(1, Math.min(mode === 'overview' ? 2.25 : 2.7, (mode === 'overview' ? .9 : .64) / safeAspect))
   const adapted = position.map((value, axis) => target[axis] + (value - target[axis]) * fit) as Vec3
@@ -23,7 +24,7 @@ export function cameraPosition(mode: CameraMode, aspect: number): Vec3 {
   return adapted
 }
 
-export function createSceneCamera(mode: CameraMode) {
+export function createSceneCamera(mode: CameraMode | 'hero') {
   const view = cameraViews[mode]
   const camera = new PerspectiveCamera(view.fov, 1, .5, 2600)
   camera.position.set(...view.position)

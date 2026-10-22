@@ -83,7 +83,7 @@ export function buildThemeSignature(theme: ThemeName | null): ThemeSignature {
     }
   }
 
-  // Keep attachments seated on the new 64 x 96 x 18 gate instead of the old roof anchor.
+  // Keep the Hero-slot attachments anchored to the new gate until the Hero permits them again.
   const heroAnchor = { y: megaConfig.gate.height, z: megaConfig.frontZ + megaConfig.dimensions.depth / 2 }
   for (const side of [-1, 1]) {
     if (theme === 'harbor') {
@@ -118,5 +118,5 @@ export function buildThemeSignature(theme: ThemeName | null): ThemeSignature {
     }
   }
 
-  return { bodies, accents, attachments }
+  return { bodies, accents, attachments: attachments.map(item => ({ ...item, slot: 'hero' })) }
 }

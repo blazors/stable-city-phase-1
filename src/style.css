@@ -258,6 +258,10 @@ summary { cursor: pointer; }
 .weather-picker .segmented button { font-size: 11px; padding: 6px 10px; }
 .weather-picker > small { color: #9baeb1; font-size: 10px; line-height: 1.5; }
 .visual-stage, .quality-stage { position: relative; isolation: isolate; overflow: hidden; height: min(62vh, 720px); min-height: 410px; border: 1px solid #465357; border-radius: 8px; background: #243a42; }
+.visual-stage:has([data-hero-aspect="fixed"]), .quality-stage:has([data-hero-aspect="fixed"]) { container-type: size; display: grid; place-items: center; }
+.visual-stage:has([data-hero-aspect="fixed"]) > div[data-hero-aspect="fixed"], .quality-stage:has([data-hero-aspect="fixed"]) > div[data-hero-aspect="fixed"] { height: auto; }
+.visual-stage:has([data-hero-aspect="fixed"]) .scene-grade, .visual-stage:has([data-hero-aspect="fixed"]) .scene-aperture, .quality-stage:has([data-hero-aspect="fixed"]) .scene-grade, .quality-stage:has([data-hero-aspect="fixed"]) .scene-aperture { left: 50%; top: 50%; right: auto; bottom: auto; width: min(100cqw, 177.7778cqh); aspect-ratio: 16 / 9; transform: translate(-50%, -50%); }
+.visual-stage:has([data-hero-aspect="fixed"]) .scene-caption, .quality-stage:has([data-hero-aspect="fixed"]) .scene-caption { left: calc((100cqw - min(100cqw, 177.7778cqh)) / 2 + 22px); right: auto; bottom: calc((100cqh - min(100cqh, 56.25cqw)) / 2 + 22px); text-align: left; }
 .visual-stage, .quality-stage { --scene-saturation: 1.02; --scene-contrast: 1.02; }
 .visual-stage:has(.grade-sunset), .quality-stage:has(.grade-sunset) { --scene-saturation: 1; --scene-contrast: 1.035; }
 .visual-stage:has(.grade-night), .quality-stage:has(.grade-night) { --scene-saturation: .96; --scene-contrast: 1; }

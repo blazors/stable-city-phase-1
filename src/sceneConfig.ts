@@ -2,27 +2,27 @@ export type Vec3 = [number, number, number]
 
 const cameraPreset = {
   overview: { position: [-270, 155, -305] as Vec3, target: [0, 28, 45] as Vec3, fov: 46 },
-  hero: { position: [-24, 3.5, -115] as Vec3, target: [0, 38, 16] as Vec3, fov: 50 },
+  hero: { position: [-68, 14, -196] as Vec3, target: [-6, 62, 20] as Vec3, fov: 44 },
   elevated: { position: [-125, 63, -155] as Vec3, target: [0, 37, 18] as Vec3, fov: 46 },
 } as const
 
 export const sceneConfig = {
   camera: {
     cameraPreset,
-    heroCameraTarget: [0, 38, 16] as Vec3,
-    heroCameraFov: 50,
+    heroCameraTarget: [-6, 62, 20] as Vec3,
+    heroCameraFov: 44,
   },
   mega: {
-    dimensions: { width: 132, height: 92, depth: 36 },
-    center: [0, 46, 18] as Vec3,
-    frontZ: 0,
-    gate: { width: 66, height: 66, depth: 36 },
+    dimensions: { width: 140, height: 124, depth: 50 },
+    center: [0, 62, 21] as Vec3,
+    frontZ: -4,
+    gate: { width: 64, height: 92, depth: 40 },
     gateHeightScale: 1,
-    beamDepth: 36,
-    portalWidth: 66,
-    bridgePath: [[60, 15, -56], [45, 15, -34], [20, 15, -18], [0, 15, -8], [0, 15, 28], [0, 15, 42]] as Vec3[],
-    bridgeHeight: 15,
-    clearance: { width: 132, depth: 36, margin: 2 },
+    beamDepth: 44,
+    portalWidth: 64,
+    bridgePath: [[150, 18, -30], [110, 18, -22], [76, 18, -16], [42, 18, -6], [12, 18, 6], [12, 18, 48], [12, 18, 62]] as Vec3[],
+    bridgeHeight: 17.4,
+    clearance: { width: 140, depth: 50, margin: 2 },
   },
   projection: {
     cameraHeight: [3, 10] as const,

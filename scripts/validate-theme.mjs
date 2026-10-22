@@ -43,6 +43,7 @@ for (const [index, theme] of themeNames.entries()) {
   assert(signature.bodies.length > 0 && signature.bodies.length <= 40, `${theme} body budget is bounded`)
   assert(signature.accents.length > 0 && signature.accents.length <= 8, `${theme} accent budget is bounded`)
   assert(signature.attachments.length > 0, `${theme} has Hero attachments`)
+  assert(signature.attachments.every(item => item.slot === 'hero'), `${theme} attachments are marked as hidden Hero-slot decor`)
   const allBoxes = [...signature.bodies, ...signature.attachments, ...signature.accents]
   assert(allBoxes.length <= 120, `${theme} public-space and Hero assets stay within 120 boxes`)
   assert(allBoxes.length * 12 <= 1440, `${theme} public-space and Hero assets stay within 1,440 box triangles`)
@@ -120,7 +121,7 @@ assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" gl
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
 assert.equal([...scene.matchAll(/<Boxes\b/g)].length, 42, 'P0 mega greybox keeps the bounded shared Boxes budget with the bridge batches')
 assert.equal([...scene.matchAll(/<instancedMesh\b/g)].length, 5, 'Stage 16 reuses the existing shared instancing mechanism')
-assert.match(scene, /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'public-space and Hero attachment boxes share one non-shadowing batch and night accents share one low-emission batch')
+assert.match(scene, /function ThemeSignatureOverlay\([\s\S]*?buildThemeSignature\(theme\)[\s\S]*?\[\.\.\.signature\.bodies, \.\.\.signature\.attachments\][\s\S]*?filter\(item => item\.slot !== 'hero'\)[\s\S]*?<Boxes items=\{bodies\}[\s\S]*?castShadow=\{false\} receiveShadow=\{false\}[\s\S]*?night && <Boxes items=\{signature\.accents\.filter\(item => item\.slot !== 'hero'\)\}[\s\S]*?emissiveIntensity=\{\.18\} castShadow=\{false\} receiveShadow=\{false\}/, 'public-space theme batches omit hidden Hero-slot decorations')
 assert.match(scene, /\{enabled && <ThemeSignatureOverlay theme=\{theme\} night=\{night\} \/>\}/, 'Theme OFF does not mount the signature overlay')
 assert.doesNotMatch(scene.match(/function ThemeSignatureOverlay\([\s\S]*?\n\}/)?.[0] ?? '', /quality|detail/, 'LOW retains the complete signature asset set')
 console.log('Theme materials, signature geometry budgets, Theme OFF behavior, lighting and batching contracts passed.')
