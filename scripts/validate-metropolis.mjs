@@ -234,4 +234,8 @@ for (const seed of [0, 1, 240319, 4294967295]) {
   console.log(`seed ${seed}: ${scene.buildings.length} outer buildings, ${scene.bridges.length} bridges, core ${city.signature}; geometry checks passed`)
 }
 assert.notDeepEqual(generateMetropolis(0).buildings, generateMetropolis(1).buildings, 'different seeds vary outer buildings')
+const sceneSource = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
+assert.match(sceneSource, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.22 : \.06\} \/>/, 'waterfront city lights use the reduced night emission while retaining their day value')
+assert.match(sceneSource, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.15 : \.025\} \/>/, 'route lights use the reduced night emission while retaining their day value')
+assert.match(sceneSource, /MegaPracticalLights time=\{time\} theme=\{enabled \? theme : null\} mood=\{mood\}/, 'local P2 practical lights remain independent of outer-city dimming')
 console.log('Metropolitan determinism, finite geometry, protected core, river clearance and bridge spans passed.')

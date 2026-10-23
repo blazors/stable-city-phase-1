@@ -44,6 +44,40 @@ export const themeSpecs: Record<ThemeName, ThemeSpec> = {
   ember: { id: 'ember', label: 'Ember Foundry', primary: '#6b4541', accent: '#efb07b', bodyLight: '#bfa18d', bodyDark: '#583f3c', trim: '#a2765d', glass: '#303d44', foliage: '#6b7058', emission: '#ee995d', megaBody: '#bfa18d', megaInset: '#583f3c', materialResponse: { coreBody: { roughness: .78, metalness: .08 }, coreTrim: { roughness: .56, metalness: .22 }, coreGlass: { roughness: .32, metalness: .18 }, megaBody: { roughness: .67, metalness: .14 }, megaRibs: { roughness: .44, metalness: .28 }, megaInset: { roughness: .31, metalness: .22 } }, atmosphere: '#b87a70', primaryHue: 'oxidized umber', secondaryHue: 'charcoal metal', accentHue: 'heated copper', warmCoolRelation: 'warm base / hot accent', saturationProfile: 'focused', valueProfile: 'deep contrast', contrastMode: 'graphic', emissionHue: 'forge orange', atmosphereTint: 'dry ash', allowedSlots: sharedAllowedSlots, blockedFields: sharedBlockedFields },
 }
 
+type MegaMaterialFamily = { color: string; roughness: number; metalness: number }
+type MegaMaterialFamilySet = Record<'mineral' | 'steel' | 'interior' | 'equipment', MegaMaterialFamily>
+
+const megaMaterialFamilySpecs: Record<ThemeName | 'off', MegaMaterialFamilySet> = {
+  off: {
+    mineral: { color: '#aaaeb0', roughness: .80, metalness: .03 },
+    steel: { color: '#606d75', roughness: .52, metalness: .28 },
+    interior: { color: '#99978c', roughness: .62, metalness: .10 },
+    equipment: { color: '#7d898d', roughness: .66, metalness: .16 },
+  },
+  harbor: {
+    mineral: { color: '#a5b3b5', roughness: .80, metalness: .03 },
+    steel: { color: '#52717b', roughness: .52, metalness: .28 },
+    interior: { color: '#9c9b89', roughness: .62, metalness: .10 },
+    equipment: { color: '#718b8e', roughness: .66, metalness: .16 },
+  },
+  verdant: {
+    mineral: { color: '#a9b8a5', roughness: .88, metalness: .02 },
+    steel: { color: '#5b756a', roughness: .68, metalness: .10 },
+    interior: { color: '#a0a58d', roughness: .70, metalness: .08 },
+    equipment: { color: '#718568', roughness: .74, metalness: .10 },
+  },
+  ember: {
+    mineral: { color: '#b59b8d', roughness: .76, metalness: .10 },
+    steel: { color: '#755752', roughness: .48, metalness: .30 },
+    interior: { color: '#a68e82', roughness: .58, metalness: .16 },
+    equipment: { color: '#825d53', roughness: .64, metalness: .22 },
+  },
+}
+
+export function megaMaterialFamilies(theme: ThemeName | null) {
+  return megaMaterialFamilySpecs[theme ?? 'off']
+}
+
 export function interpretThemeBrief(input: string): ThemeName {
   const brief = input.toLowerCase()
   if (/绿|森林|植物|生态|verdant|moss/.test(brief)) return 'verdant'

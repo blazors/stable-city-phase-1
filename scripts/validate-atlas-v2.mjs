@@ -17,6 +17,7 @@ const megaSource = (await readFile(new URL('../src/megaGeometry.ts', import.meta
   .replace(/from (['"])three\1/g, resolveThree)
   .replace(/from (['"])\.\/sceneConfig\1/g, `from '${configUrl}'`)
 const mega = await moduleFrom(transpile(megaSource))
+const { megaMaintenanceBus, megaScaleWorkers } = mega
 const citySource = await readFile(new URL('../src/city.ts', import.meta.url), 'utf8')
 const city = await moduleFrom(transpile(citySource))
 
@@ -43,6 +44,7 @@ assert(structure.bodies.some(item => item.position.join(',') === '-70,3,22' && i
 assert(structure.bodies.some(item => item.position.join(',') === '70,3,22' && item.size.join(',') === '40,6,104'), 'right foundation mirrors the P0 base')
 assert.deepEqual(mega.megaServiceBoxes.map(item => item.position), [[-65, 74, 22], [65, 74, 22]], 'service boxes are lifted to both shoulders')
 assert.deepEqual(mega.megaServicePlatforms.map(item => item.position), [[-65, 66, 22], [65, 66, 22]], 'service platforms sit beneath the shoulder boxes')
+assert.equal(structure.equipment.length, 5, 'equipment family separates the crown cap, service boxes, and platforms from mineral mass')
 
 const legs = structure.braces
 assert.equal(legs.length, 4, 'four long sloping supports use single boxes')
@@ -130,7 +132,46 @@ assert(mega.megaServicePlatforms.every((platform, index) => obbIntersects(platfo
 assert(structure.serviceBraces.every(brace => structure.bodies.slice(0, 2).some(column => obbIntersects(brace, column)) && mega.megaServicePlatforms.some(platform => obbIntersects(brace, platform))), 'short braces join the shoulder structure to the platforms')
 assert(structure.serviceBraces.every(brace => legs.some(leg => obbIntersects(brace, leg))), 'shoulder braces seat into the diagonal leg joints')
 
-const occupied = [...structure.bodies, ...structure.inset, ...structure.braces, ...structure.ribs, ...structure.frames, ...structure.serviceBraces, ...structure.roofFrame, ...bridge.decks, ...bridge.joints, ...bridge.girders, ...bridge.rails, ...bridge.railPosts, ...bridge.supports]
+assert.equal(structure.inset.length, 3, 'two side receiver skins and one soffit use real-thickness boxes')
+const [leftSkin, rightSkin, soffit] = structure.inset
+assert.equal(leftSkin.position[0] + leftSkin.size[0] / 2, -28, 'left receiver inner edge stops at X=-28')
+assert.equal(rightSkin.position[0] - rightSkin.size[0] / 2, 28, 'right receiver inner edge stops at X=28')
+assert.equal(soffit.position[1] - soffit.size[1] / 2, 88, 'soffit lower surface stops at Y=88')
+assert(obbIntersects(leftSkin, structure.bodies[0]) && obbIntersects(rightSkin, structure.bodies[1]), 'side skins overlap their columns instead of floating free')
+assert(obbIntersects(soffit, structure.bodies[2]), 'soffit overlaps the crossbeam at its underside')
+assert(![leftSkin, rightSkin, soffit].some(item => obbIntersects(item, aperture)), 'receiver skins stop at opening boundaries without invading clear volume')
+
+const bridgeStructure = [...bridge.decks, ...bridge.joints, ...bridge.girders, ...bridge.rails, ...bridge.railPosts, ...bridge.supports]
+const materialFamilies = [
+  structure.bodies,
+  [...structure.braces, ...structure.ribs, ...structure.serviceBraces, ...bridgeStructure],
+  [...structure.inset, ...structure.frames],
+  [...structure.equipment, ...structure.roofFrame],
+]
+const familyItems = materialFamilies.flat()
+const familyKeys = familyItems.map(({ position, size, rotation, quaternion }) => JSON.stringify({ position, size, rotation, quaternion }))
+assert.equal(new Set(familyKeys).size, familyKeys.length, 'mineral, steel, interior, and equipment boxes are mutually exclusive')
+
+assert.equal(megaMaintenanceBus.length, 6, 'maintenance bus uses one six-box instance batch')
+const busWheels = megaMaintenanceBus.filter(item => item.size.join(',') === '0.75,0.6,0.45')
+assert.equal(busWheels.length, 4, 'maintenance bus has four wheel blocks')
+assert(busWheels.every(wheel => wheel.position[1] - wheel.size[1] / 2 === 18.8), 'all bus wheel bottoms contact the elevated deck at Y=18.8')
+assert(megaMaintenanceBus.every(item => item.position[0] - item.size[0] / 2 >= -32 && item.position[0] + item.size[0] / 2 <= 32 && item.position[2] - item.size[2] / 2 >= -22 && item.position[2] + item.size[2] / 2 <= -14), 'bus is contained by the central straight segment and bridge width')
+assert(megaMaintenanceBus.every(item => bridgeStructure.every(detail => !obbIntersects(item, detail)) && legs.every(leg => !obbIntersects(item, leg))), 'bus clears bridge rails, supports, and diagonal legs')
+
+assert.equal(megaScaleWorkers.length, 12, 'four scale workers use one twelve-box instance batch')
+const expectedWorkerFeet = [[-22, 18.8, -21.1], [-19, 18.8, -21.1], [-61, 6, -18], [-64, 6, -18]]
+for (let index = 0; index < megaScaleWorkers.length; index += 3) {
+  const [head, torso, lower] = megaScaleWorkers.slice(index, index + 3)
+  const foot = [lower.position[0], lower.position[1] - lower.size[1] / 2, lower.position[2]]
+  assert.deepEqual(foot, expectedWorkerFeet[index / 3], 'worker lower box meets its authored bridge or foundation foot point')
+  assert(Math.abs(head.position[1] + head.size[1] / 2 - foot[1] - 1.78) < 1e-9, 'each three-box worker proxy is 1.78 units tall')
+  assert(Math.abs(torso.position[1] - torso.size[1] / 2 - (lower.position[1] + lower.size[1] / 2)) < 1e-9, 'torso connects to the lower-body block')
+  assert(Math.abs(head.position[1] - head.size[1] / 2 - (torso.position[1] + torso.size[1] / 2)) < 1e-9, 'head connects to the torso block')
+}
+assert(megaScaleWorkers.every(worker => bridge.rails.every(rail => !obbIntersects(worker, rail)) && bridge.railPosts.every(post => !obbIntersects(worker, post)) && legs.every(leg => !obbIntersects(worker, leg))), 'all scale workers clear railings, posts, and diagonal legs')
+
+const occupied = [...familyItems, ...megaMaintenanceBus, ...megaScaleWorkers]
 const portalContains = point => point[0] > -28 && point[0] < 28 && point[1] > 0 && point[1] < 88 && point[2] > 2 && point[2] < 42
 for (let x = -27; x <= 27; x += 3) for (let y = 1; y < 88; y += 3) for (let z = 3; z < 42; z += 3) {
   const point = [x, y, z]
@@ -144,7 +185,7 @@ for (let x = -27; x <= 27; x += 3) for (let y = 1; y < 88; y += 3) for (let z = 
 }
 const boxCount = occupied.length
 const triangleCount = boxCount * 12 + roof.length / 9
-assert(boxCount <= 110 && triangleCount <= 1320, `P1 gate and bridge stay under 110 boxes / 1,320 triangles (boxes=${boxCount}, tris=${triangleCount})`)
+assert(boxCount <= 132 && triangleCount <= 1596, `P3 gate, bridge, bus, and workers stay under 132 boxes / 1,596 triangles (boxes=${boxCount}, tris=${triangleCount})`)
 
 assert.deepEqual(camera.cameraViews.hero, { position: [-130, 8, -255], target: [0, 48, 21], fov: 40 }, 'Hero camera pulls back to reveal crown sky margin and the complete foundation')
 assert.deepEqual(camera.cameraViews.overview, { position: [-210, 165, -225], target: [0, 40, 20], fov: 42 }, 'Overview camera matches P0 preset')
@@ -169,4 +210,4 @@ assert.match(sceneSource, /<Ground[\s\S]*?<MetropolitanLandscape[\s\S]*?<Megastr
 assert.match(sceneSource, /snowCaps\(metropolis\.parks\)/, 'park snow surfaces remain available')
 assert.match(appSource, /city\.buildings\.length/, 'Production Console statistics retain StableCity building counts')
 assert.match(appSource, /city\.signature/, 'Production Console retains StableCity signature diagnostics')
-console.log(`P1 city clearing, layered gate, through-portal, braces, continuous bridge, cameras and geometry budget passed (${boxCount} instances, ${triangleCount} triangles).`)
+console.log(`P3 city clearing, four material families, through-portal, bus/workers, continuous bridge, cameras and geometry budget passed (${boxCount} instances, ${triangleCount} triangles).`)

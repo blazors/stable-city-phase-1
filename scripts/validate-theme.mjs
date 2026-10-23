@@ -12,7 +12,7 @@ async function sourceModule(file) {
   return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`)
 }
 
-const { themeSpecs } = await sourceModule('../src/theme.ts')
+const { megaMaterialFamilies, themeSpecs } = await sourceModule('../src/theme.ts')
 const { buildThemeSignature } = await sourceModule('../src/themeSignature.ts')
 const { megaConfig } = await sourceModule('../src/sceneConfig.ts')
 const { timeLighting, megaPracticalLights, megaPracticalFixtures, megaPracticalTimeMultipliers, megaPracticalMoodMultiplier, megaPracticalSpotIntensity, megaPracticalStripIntensity } = await sourceModule('../src/lighting.ts')
@@ -35,6 +35,47 @@ for (const [name, spec] of Object.entries(themeSpecs)) {
   assert.deepEqual(spec.materialResponse, expectedResponses[name], `${name} matches the authored roughness and metalness response`)
 }
 for (const slot of materialSlots) assert.equal(new Set(Object.values(themeSpecs).map(spec => spec[slot])).size, 3, `${slot} separates all three themes`)
+const materialFamilyNames = ['mineral', 'steel', 'interior', 'equipment']
+const offFamilies = megaMaterialFamilies(null)
+const harborFamilies = megaMaterialFamilies('harbor')
+assert.deepEqual(offFamilies, {
+  mineral: { color: '#aaaeb0', roughness: .80, metalness: .03 },
+  steel: { color: '#606d75', roughness: .52, metalness: .28 },
+  interior: { color: '#99978c', roughness: .62, metalness: .10 },
+  equipment: { color: '#7d898d', roughness: .66, metalness: .16 },
+}, 'Theme OFF uses its independent neutral material-family palette')
+assert.deepEqual(harborFamilies, {
+  mineral: { color: '#a5b3b5', roughness: .80, metalness: .03 },
+  steel: { color: '#52717b', roughness: .52, metalness: .28 },
+  interior: { color: '#9c9b89', roughness: .62, metalness: .10 },
+  equipment: { color: '#718b8e', roughness: .66, metalness: .16 },
+}, 'Harbor family values match the explicit authored palette and preserve a warm-neutral interior receiver')
+assert.notDeepEqual(offFamilies, harborFamilies, 'Theme OFF remains independent from Harbor theme materials')
+const expectedThemeFamilies = {
+  verdant: {
+    mineral: { color: '#a9b8a5', roughness: .88, metalness: .02 },
+    steel: { color: '#5b756a', roughness: .68, metalness: .10 },
+    interior: { color: '#a0a58d', roughness: .70, metalness: .08 },
+    equipment: { color: '#718568', roughness: .74, metalness: .10 },
+  },
+  ember: {
+    mineral: { color: '#b59b8d', roughness: .76, metalness: .10 },
+    steel: { color: '#755752', roughness: .48, metalness: .30 },
+    interior: { color: '#a68e82', roughness: .58, metalness: .16 },
+    equipment: { color: '#825d53', roughness: .64, metalness: .22 },
+  },
+}
+for (const [theme, families] of Object.entries(expectedThemeFamilies)) assert.deepEqual(megaMaterialFamilies(theme), families, `${theme} uses an explicit four-family palette`)
+for (const theme of ['harbor', 'verdant', 'ember']) {
+  const families = megaMaterialFamilies(theme)
+  assert.equal(new Set(materialFamilyNames.map(name => families[name].color)).size, 4, `${theme} has four visually distinct material families`)
+  for (const family of materialFamilyNames) {
+    assert.match(families[family].color, /^#[\da-f]{6}$/i, `${theme}.${family} keeps a valid color`)
+    assert(families[family].roughness >= 0 && families[family].roughness <= 1, `${theme}.${family} roughness stays in range`)
+    assert(families[family].metalness >= 0 && families[family].metalness <= 1, `${theme}.${family} metalness stays in range`)
+  }
+}
+for (const family of materialFamilyNames) assert.equal(new Set(['harbor', 'verdant', 'ember'].map(theme => megaMaterialFamilies(theme)[family].color)).size, 3, `${family} preserves Theme ON variation`)
 const themeNames = ['harbor', 'verdant', 'ember']
 const signatures = themeNames.map(theme => buildThemeSignature(theme))
 for (const [index, theme] of themeNames.entries()) {
@@ -128,15 +169,16 @@ assert(mix >= .2 && mix <= .3, 'outskirts receive 20–30% theme mixing')
 assert.match(scene, /color\.setHSL\([\s\S]*?hsl\.l\)/, 'outskirts keep the original seed lightness')
 assert.match(scene, /roughness=\{roughness \?\? \(glow \? \.45 : wet \? \.22 : \.82\)\} metalness=\{metalness \?\? \(glow \? \.15 : wet \? \.10 : \.04\)\}/, 'wet roads stay smoother than the shared dry material default')
 assert.match(scene, /color=\{night \? '#526e7a' : '#547582'\} roughness=\{\.16\} metalness=\{\.08\}/, 'night puddles retain the brighter low-roughness response')
-assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaBody\.roughness \?\? \.82\} metalness=\{spec\?\.materialResponse\.megaBody\.metalness \?\? \.04\}/, 'mega body keeps Stage 9 defaults when Theme is OFF')
-assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaRibs\.roughness \?\? \.82\} metalness=\{spec\?\.materialResponse\.megaRibs\.metalness \?\? \.04\}/, 'mega ribs keep Stage 9 defaults when Theme is OFF')
-assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaInset\.roughness \?\? \.82\} metalness=\{spec\?\.materialResponse\.megaInset\.metalness \?\? \.04\}/, 'mega inset keeps Stage 9 defaults when Theme is OFF')
-assert.match(scene, /<Boxes color=\{spec\?\.megaBody/, 'theme material still applies to the replacement Mega body')
-assert.match(scene, /<Boxes color=\{spec\?\.megaBody \?\? '#d4ccb1'\} items=\{\[\.\.\.bridge\.decks, \.\.\.bridge\.joints, \.\.\.bridge\.girders\]\}/, 'theme baseline still applies to the elevated road and its girders')
+assert.match(scene, /const materials = megaMaterialFamilies\(theme\)/, 'the Mega uses the shared four-family theme resolver')
+for (const family of materialFamilyNames) assert.match(scene, new RegExp(`color=\\{materials\\.${family}\\.color\\} roughness=\\{materials\\.${family}\\.roughness\\} metalness=\\{materials\\.${family}\\.metalness\\}`), `${family} is rendered with its own family material`)
+assert.match(scene, /\.\.\.bridge\.decks, \.\.\.bridge\.joints, \.\.\.bridge\.girders, \.\.\.bridge\.supports, \.\.\.bridge\.rails, \.\.\.bridge\.railPosts/, 'all elevated bridge structures share the steel family batch')
+assert.match(scene, /function MaintenanceBus\(\)[\s\S]*?<Boxes items=\{megaMaintenanceBus\}/, 'maintenance bus is a single instance batch')
+assert.match(scene, /function ScaleWorkers\(\)[\s\S]*?<Boxes items=\{megaScaleWorkers\}/, 'four scale workers are a single instance batch')
+assert.match(scene, /<MaintenanceBus \/><ScaleWorkers \/>/, 'scale references remain mounted with the Hero scene')
 assert.doesNotMatch(scene, /visibleBodies|upperMasses|facadePanels|metropolis\.roofs|metropolis\.terraces|metropolis\.windows|warmWindows|coolWindows/, 'ordinary building, roof, terrace, and window batches are absent from P0 rendering')
 assert.doesNotMatch(scene, /<Architecture\b|<ThemeSignatureOverlay\b/, 'core architecture and decorative signature overlays are not mounted')
-assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
-assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.55 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
+assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.22 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
+assert.match(scene, /<Boxes items=\{metropolis\.routeLights\} color="#d6a66e" glow night=\{night\} emissiveIntensity=\{night \? \.15 : \.025\} \/>/, 'route lights create one restrained metropolitan night network')
 assert.match(scene, /<Boxes color="#f2c17e" items=\{details\.lamps\} glow night=\{night\} \/>/, 'core street lamps retain the shared glow default')
 assert(scene.match(/<Boxes\b/g).length < 40, 'ordinary building batches are removed from the draw-call source budget')
 assert(scene.match(/<instancedMesh\b/g).length <= 5, 'P0 keeps dynamic and surface geometry instanced')

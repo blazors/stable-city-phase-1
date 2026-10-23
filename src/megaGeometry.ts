@@ -2,7 +2,7 @@ import { megaConfig, type Vec3 } from './sceneConfig'
 import type { Building } from './city'
 
 export type Quaternion = [number, number, number, number]
-export type MegaBox = { position: Vec3; size: Vec3; rotation?: Vec3; quaternion?: Quaternion }
+export type MegaBox = { position: Vec3; size: Vec3; rotation?: Vec3; quaternion?: Quaternion; color?: string }
 
 export const megaStructureBounds = { width: megaConfig.dimensions.width, height: megaConfig.dimensions.height, depth: megaConfig.dimensions.depth, center: megaConfig.center } as const
 
@@ -30,8 +30,34 @@ export const megaMainBodies: MegaBox[] = [
   { position: [70, 3, 22], size: [40, 6, 104] },
 ]
 
-// The opening is a true through-portal: no solid may occupy its clear volume.
-export const megaGateInset: MegaBox[] = []
+// Thin receiver skins overlap the columns/header while ending exactly at the clear opening.
+export const megaGateInset: MegaBox[] = [
+  { position: [-28.4, 44, 22], size: [.8, 88, 40] },
+  { position: [28.4, 44, 22], size: [.8, 88, 40] },
+  { position: [0, 88.4, 22], size: [56, .8, 40] },
+]
+
+const megaEquipmentBodySet = [megaRoofDeck, ...megaServiceBoxes, ...megaServicePlatforms]
+
+export const megaMaintenanceBus: MegaBox[] = [
+  { position: [12, 20.55, -18], size: [10, 2.9, 2.1], color: '#aeb9b2' },
+  { position: [12, 20.65, -19.08], size: [6.8, .72, .08], color: '#25434b' },
+  ...[8.8, 15.2].flatMap(x => [-18.96, -17.04].map(z => ({
+    position: [x, 19.1, z] as Vec3,
+    size: [.75, .6, .45] as Vec3,
+    color: '#29383c',
+  }))),
+]
+
+const scaleWorkerFeet: Vec3[] = [
+  [-22, 18.8, -21.1], [-19, 18.8, -21.1],
+  [-61, 6, -18], [-64, 6, -18],
+]
+export const megaScaleWorkers: MegaBox[] = scaleWorkerFeet.flatMap(([x, y, z], index) => [
+  { position: [x, y + 1.62, z], size: [.28, .32, .28], color: '#c9a67f' },
+  { position: [x, y + 1.14, z], size: [.40, .64, .20], color: index % 2 ? '#738b82' : '#b89b71' },
+  { position: [x, y + .41, z], size: [.34, .82, .20], color: '#38464a' },
+])
 
 const beamBetween = (from: Vec3, to: Vec3, width: number, depth: number): MegaBox => {
   const direction: Vec3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]]
@@ -158,7 +184,8 @@ export function createMegaStructureGeometry() {
     quaternion: item.quaternion ? [...item.quaternion] as Quaternion : undefined,
   })
   return {
-    bodies: megaMainBodies.map(copy),
+    bodies: megaMainBodies.filter(item => !megaEquipmentBodySet.includes(item)).map(copy),
+    equipment: megaEquipmentBodySet.map(copy),
     inset: megaGateInset.map(copy),
     braces: megaMajorBraces.map(copy),
     ribs: megaLongitudinalRibs.map(copy),

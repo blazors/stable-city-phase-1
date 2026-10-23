@@ -3,7 +3,7 @@ import { OrbitControls } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { BufferGeometry, Color, Float32BufferAttribute, InstancedMesh, Object3D, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
-import { themeSpecs, type ThemeName } from './theme'
+import { megaMaterialFamilies, themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverReflectionSources, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
@@ -12,7 +12,7 @@ import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
 import { megaPracticalFixtures, megaPracticalLights, megaPracticalSpotIntensity, megaPracticalStripIntensity, sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaBridgeGeometry, createMegaRoofVertices, createMegaStructureGeometry } from './megaGeometry'
+import { createMegaBridgeGeometry, createMegaRoofVertices, createMegaStructureGeometry, megaMaintenanceBus, megaScaleWorkers } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
@@ -119,25 +119,30 @@ function Megastructure({ theme }: { theme: ThemeName | null }) {
     return geometry
   }, [])
   useEffect(() => () => roofGeometry.dispose(), [roofGeometry])
-  const spec = theme ? themeSpecs[theme] : null
+  const materials = megaMaterialFamilies(theme)
   return <>
-    <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} items={[
-      ...structure.bodies,
-      ...structure.roofFrame,
-      ...structure.serviceBraces,
-    ]} />
+    <Boxes color={materials.mineral.color} roughness={materials.mineral.roughness} metalness={materials.mineral.metalness} items={structure.bodies} />
     <mesh geometry={roofGeometry} castShadow receiveShadow>
-      <meshStandardMaterial color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} />
+      <meshStandardMaterial color={materials.mineral.color} roughness={materials.mineral.roughness} metalness={materials.mineral.metalness} />
     </mesh>
-    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={[...structure.braces, ...structure.ribs]} />
-    <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
+    <Boxes color={materials.steel.color} roughness={materials.steel.roughness} metalness={materials.steel.metalness} items={[
+      ...structure.braces, ...structure.ribs, ...structure.serviceBraces,
+      ...bridge.decks, ...bridge.joints, ...bridge.girders, ...bridge.supports, ...bridge.rails, ...bridge.railPosts,
+    ]} />
+    <Boxes color={materials.interior.color} roughness={materials.interior.roughness} metalness={materials.interior.metalness} items={[
       ...structure.inset,
       ...structure.frames,
     ]} />
-    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, ...bridge.joints, ...bridge.girders]} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} items={[...bridge.rails, ...bridge.railPosts]} />
+    <Boxes color={materials.equipment.color} roughness={materials.equipment.roughness} metalness={materials.equipment.metalness} items={[...structure.equipment, ...structure.roofFrame]} />
   </>
+}
+
+function MaintenanceBus() {
+  return <Boxes items={megaMaintenanceBus} color="#ffffff" roughness={.68} metalness={.08} castShadow={false} receiveShadow={false} />
+}
+
+function ScaleWorkers() {
+  return <Boxes items={megaScaleWorkers} color="#ffffff" roughness={.82} metalness={.02} castShadow={false} receiveShadow={false} />
 }
 
 function MegaPracticalLights({ time, theme, mood }: { time: TimeOfDay; theme: ThemeName | null; mood: ResolvedMood | undefined }) {
@@ -357,8 +362,8 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
     <Boxes items={paths} color={theme ? '#ffffff' : '#a9ac96'} />
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
     <Boxes items={trees} foliage />
-    <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? .65 : .06} />
-    <Boxes items={metropolis.routeLights} color="#d6a66e" glow night={night} emissiveIntensity={night ? .55 : .025} />
+    <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? .22 : .06} />
+    <Boxes items={metropolis.routeLights} color="#d6a66e" glow night={night} emissiveIntensity={night ? .15 : .025} />
     {metropolis.bridges.map(({ x, z, span }) => <group key={x} position={[x, 0, z]}>
       <Boxes color="#b4b6a9" items={[{ position: [0, .65, 0], size: [5, 1, span] }, ...[-1, 1].map(v => ({ position: [0, -1, v * (span / 2 - 5)] as Vec3, size: [3, 3, 1] as Vec3 }))]} />
       <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, span] }))} />
@@ -500,7 +505,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={effectiveWeather} quality={quality} />
     {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
     {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
-    <Megastructure theme={enabled ? theme : null} /><MegaPracticalLights time={time} theme={enabled ? theme : null} mood={mood} /><Transport night={night} count={config.traffic} />
+    <Megastructure theme={enabled ? theme : null} /><MegaPracticalLights time={time} theme={enabled ? theme : null} mood={mood} /><Transport night={night} count={config.traffic} /><MaintenanceBus /><ScaleWorkers />
     <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={mode === 'mega' ? 112 * Math.PI / 180 : Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
