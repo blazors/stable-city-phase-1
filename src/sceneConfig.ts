@@ -2,14 +2,14 @@ export type Vec3 = [number, number, number]
 
 const cameraPreset = {
   overview: { position: [-210, 165, -225] as Vec3, target: [0, 40, 20] as Vec3, fov: 42 },
-  hero: { position: [-104, 7, -202] as Vec3, target: [0, 59, 21] as Vec3, fov: 40 },
+  hero: { position: [-130, 8, -255] as Vec3, target: [0, 48, 21] as Vec3, fov: 40 },
   elevated: { position: [-150, 85, -165] as Vec3, target: [0, 54, 22] as Vec3, fov: 43 },
 } as const
 
 export const sceneConfig = {
   camera: {
     cameraPreset,
-    heroCameraTarget: [0, 59, 21] as Vec3,
+    heroCameraTarget: [0, 48, 21] as Vec3,
     heroCameraFov: 40,
   },
   mega: {

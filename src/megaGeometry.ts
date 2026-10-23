@@ -7,22 +7,25 @@ export type MegaBox = { position: Vec3; size: Vec3; rotation?: Vec3; quaternion?
 export const megaStructureBounds = { width: megaConfig.dimensions.width, height: megaConfig.dimensions.height, depth: megaConfig.dimensions.depth, center: megaConfig.center } as const
 
 export const megaRoofSupportTop = megaStructureBounds.height
-export const megaRoofFascia: MegaBox = { position: [0, 114, 22], size: [140, 8, 50] }
-export const megaRoofDeck: MegaBox = { position: [0, 120, 22], size: [126, 8, 38] }
+export const megaRoofFascia: MegaBox = { position: [0, 118.4, 22], size: [126, 4.8, 36] }
+export const megaRoofDeck: MegaBox = { position: [0, 121.3, 22], size: [130, .6, 40] }
+export const megaServiceBoxes: MegaBox[] = [
+  { position: [-65, 74, 22], size: [18, 20, 34] },
+  { position: [65, 74, 22], size: [18, 20, 34] },
+]
+export const megaServicePlatforms: MegaBox[] = [
+  { position: [-65, 66, 22], size: [24, 2.4, 40] },
+  { position: [65, 66, 22], size: [24, 2.4, 40] },
+]
 
 export const megaMainBodies: MegaBox[] = [
   { position: [-43, 44, 22], size: [30, 88, 40] },
   { position: [43, 44, 22], size: [30, 88, 40] },
   { position: [0, 97, 22], size: [116, 18, 40] },
-  { position: [0, 109, 22], size: [124, 6, 42] },
   megaRoofFascia,
   megaRoofDeck,
-  { position: [-69, 30, 22], size: [18, 30, 34] },
-  { position: [69, 30, 22], size: [18, 30, 34] },
-  { position: [-67, 51, 22], size: [22, 3, 38] },
-  { position: [67, 51, 22], size: [22, 3, 38] },
-  { position: [-45, 19, 50], size: [24, 2, 16] },
-  { position: [45, 19, 50], size: [24, 2, 16] },
+  ...megaServiceBoxes,
+  ...megaServicePlatforms,
   { position: [-70, 3, 22], size: [40, 6, 104] },
   { position: [70, 3, 22], size: [40, 6, 104] },
 ]
@@ -44,6 +47,43 @@ const beamBetween = (from: Vec3, to: Vec3, width: number, depth: number): MegaBo
   }
 }
 
+export function createMegaRoofVertices() {
+  const lower: Vec3[] = [[-62, 106, 1], [-62, 106, 43], [62, 106, 43], [62, 106, 1]]
+  const upper: Vec3[] = [[-70, 116, -3], [-70, 116, 47], [70, 116, 47], [70, 116, -3]]
+  const vertices: number[] = []
+  const triangle = (a: Vec3, b: Vec3, c: Vec3) => vertices.push(...a, ...b, ...c)
+  triangle(lower[0], lower[2], lower[1]); triangle(lower[0], lower[3], lower[2])
+  triangle(upper[0], upper[1], upper[2]); triangle(upper[0], upper[2], upper[3])
+  for (let i = 0; i < 4; i++) {
+    const next = (i + 1) % 4
+    triangle(lower[i], lower[next], upper[next])
+    triangle(lower[i], upper[next], upper[i])
+  }
+  return vertices
+}
+
+export const megaRoofFrame: MegaBox[] = [
+  { position: [0, 123.2, -3], size: [140, .8, .8] },
+  { position: [0, 123.2, 47], size: [140, .8, .8] },
+  { position: [-70, 123.2, 22], size: [.8, .8, 50] },
+  { position: [70, 123.2, 22], size: [.8, .8, 50] },
+]
+
+export const megaLongitudinalRibs: MegaBox[] = [-1, 1].flatMap(side => [1.8, 42.2].flatMap(z => [31, 39, 47, 55].map(offset => ({
+  position: [side * offset, 46, z] as Vec3,
+  size: [1.4, 84, 2.4] as Vec3,
+}))))
+
+export const megaDoorFrames: MegaBox[] = [1.1, 22, 42.9].flatMap(z => [
+  { position: [-29, 44, z] as Vec3, size: [1, 88, 1.6] as Vec3 },
+  { position: [29, 44, z] as Vec3, size: [1, 88, 1.6] as Vec3 },
+  { position: [0, 88.6, z] as Vec3, size: [58, 1.2, 1.6] as Vec3 },
+])
+
+export const megaServiceBraces: MegaBox[] = [-1, 1].flatMap(side => [5, 39].map(z => beamBetween(
+  [side * 58, 62, z], [side * 75, 66, z], 2.2, 2.2,
+)))
+
 export const megaMajorBraces: MegaBox[] = [
   ...[-1, 1].flatMap(side => [
     beamBetween([side * 78, 6, -22], [side * 55, 78, 5], 10, 12),
@@ -55,7 +95,7 @@ export const megaDoorBeam = megaMainBodies[2]
 export const megaDeepEntrance = megaGateInset[0]
 
 type BridgeNode = Vec3
-export type MegaBridgeGeometry = { decks: MegaBox[]; joints: MegaBox[]; rails: MegaBox[]; supports: MegaBox[] }
+export type MegaBridgeGeometry = { decks: MegaBox[]; joints: MegaBox[]; girders: MegaBox[]; rails: MegaBox[]; railPosts: MegaBox[]; supports: MegaBox[] }
 
 const bridgeSegment = (from: BridgeNode, to: BridgeNode, width: number, thickness: number, yOffset = 0): MegaBox => {
   const dx = to[0] - from[0], dz = to[2] - from[2], length = Math.hypot(dx, dz)
@@ -64,9 +104,19 @@ const bridgeSegment = (from: BridgeNode, to: BridgeNode, width: number, thicknes
 
 export function createMegaBridgeGeometry(): MegaBridgeGeometry {
   const width = 8
-  const decks: MegaBox[] = [], joints: MegaBox[] = [], rails: MegaBox[] = [], supports: MegaBox[] = []
+  const decks: MegaBox[] = [], joints: MegaBox[] = [], girders: MegaBox[] = [], rails: MegaBox[] = [], railPosts: MegaBox[] = [], supports: MegaBox[] = []
   const path = megaConfig.bridgePath
-  for (let i = 0; i < path.length - 1; i++) decks.push(bridgeSegment(path[i], path[i + 1], width, 1.6))
+  for (let i = 0; i < path.length - 1; i++) {
+    const from = path[i], to = path[i + 1]
+    decks.push(bridgeSegment(from, to, width, 1.6))
+    const angle = Math.atan2(to[0] - from[0], to[2] - from[2])
+    const normalX = Math.cos(angle), normalZ = -Math.sin(angle)
+    for (const side of [-1, 1]) girders.push({
+      position: [(from[0] + to[0]) / 2 + side * normalX * 3.8, 16.8, (from[2] + to[2]) / 2 + side * normalZ * 3.8],
+      size: [1.2, 1.6, Math.hypot(to[0] - from[0], to[2] - from[2])],
+      rotation: [0, angle, 0],
+    })
+  }
   for (let i = 1; i < path.length - 1; i++) joints.push({ position: path[i], size: [8.8, 1.6, 8.8] })
 
   const railOffset = width / 2 - .2
@@ -81,7 +131,8 @@ export function createMegaBridgeGeometry(): MegaBridgeGeometry {
       const half = (previousAngle + nextAngle) / 2, scale = railOffset / Math.max(.25, Math.cos((nextAngle - previousAngle) / 2))
       return [node[0] + Math.cos(half) * side * scale, node[1] + .8, node[2] - Math.sin(half) * side * scale] as Vec3
     })
-    for (let i = 0; i < railNodes.length - 1; i++) rails.push(bridgeSegment(railNodes[i], railNodes[i + 1], .25, .5))
+    for (let i = 0; i < railNodes.length - 1; i++) rails.push(bridgeSegment(railNodes[i], railNodes[i + 1], .25, .5, .8))
+    for (let i = 0; i < railNodes.length; i += 2) railPosts.push({ position: [railNodes[i][0], railNodes[i][1] + .6, railNodes[i][2]], size: [.25, 1.2, .25] })
   }
 
   // Piers stop outside the clear portal; the central 56-unit opening stays free.
@@ -92,9 +143,10 @@ export function createMegaBridgeGeometry(): MegaBridgeGeometry {
     const z = from[2] + (to[2] - from[2]) * t
     const height = 17.2
     supports.push({ position: [x, height / 2, z], size: [1.8, height, 1.8] })
-    supports.push({ position: [x, height + .4, z], size: [9, .8, 1.8] })
+    const angle = Math.atan2(to[0] - from[0], to[2] - from[2])
+    supports.push({ position: [x, height + .4, z], size: [9, .8, 1.8], rotation: [0, angle, 0] })
   }
-  return { decks, joints, rails, supports }
+  return { decks, joints, girders, rails, railPosts, supports }
 }
 
 export function createMegaStructureGeometry() {
@@ -105,7 +157,15 @@ export function createMegaStructureGeometry() {
     rotation: item.rotation ? [...item.rotation] as Vec3 : undefined,
     quaternion: item.quaternion ? [...item.quaternion] as Quaternion : undefined,
   })
-  return { bodies: megaMainBodies.map(copy), inset: megaGateInset.map(copy), braces: megaMajorBraces.map(copy) }
+  return {
+    bodies: megaMainBodies.map(copy),
+    inset: megaGateInset.map(copy),
+    braces: megaMajorBraces.map(copy),
+    ribs: megaLongitudinalRibs.map(copy),
+    frames: megaDoorFrames.map(copy),
+    serviceBraces: megaServiceBraces.map(copy),
+    roofFrame: megaRoofFrame.map(copy),
+  }
 }
 
 export function intersectsMegaHeroFootprint(position: Vec3, size: Vec3, margin = 0) {

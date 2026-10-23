@@ -5,10 +5,13 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 const checks = [
-  ['P0 scene config centralizes new camera presets and gate dimensions', /overview: \{ position: \[-210, 165, -225\].*target: \[0, 40, 20\].*fov: 42[\s\S]*hero: \{ position: \[-104, 7, -202\].*target: \[0, 59, 21\].*fov: 40[\s\S]*elevated: \{ position: \[-150, 85, -165\].*target: \[0, 54, 22\].*fov: 43[\s\S]*width: 180, height: 124, depth: 104[\s\S]*portalWidth: 56[\s\S]*bridgePath/, 'src/sceneConfig.ts'],
+  ['P1 Hero framing preserves its low target while pulling back for crown sky margin and complete base', /overview: \{ position: \[-210, 165, -225\].*target: \[0, 40, 20\].*fov: 42[\s\S]*hero: \{ position: \[-130, 8, -255\].*target: \[0, 48, 21\].*fov: 40[\s\S]*elevated: \{ position: \[-150, 85, -165\].*target: \[0, 54, 22\].*fov: 43[\s\S]*heroCameraTarget: \[0, 48, 21\][\s\S]*width: 180, height: 124, depth: 104[\s\S]*portalWidth: 56[\s\S]*bridgePath/, 'src/sceneConfig.ts'],
   ['P0 camera keeps the legacy mega mode mapped to the authored Hero preset and adds 3Q Elevated', /heroCameraPreset = \{[\s\S]*mega: heroCameraPreset[\s\S]*elevated: cameraConfig\.cameraPreset\.elevated/, 'src/camera.ts'],
   ['P0 mega greybox exposes beams, inset and braces', /export const megaMajorBraces[\s\S]*export const megaDoorPillars[\s\S]*export const megaDoorBeam[\s\S]*export const megaDeepEntrance/, 'src/megaGeometry.ts'],
   ['P0 portal has single quaternion diagonal braces and a lateral bridge', /true through-portal[\s\S]*megaGateInset: MegaBox\[\] = \[\][\s\S]*beamBetween[\s\S]*quaternion: q\.map[\s\S]*createMegaBridgeGeometry[\s\S]*const width = 8/, 'src/megaGeometry.ts'],
+  ['P1 crown uses a low-face sloped frustum, recessed equipment and sparse perimeter frame', /^(?=[\s\S]*createMegaRoofVertices)(?=[\s\S]*\[-62, 106, 1\])(?=[\s\S]*\[-70, 116, -3\])(?=[\s\S]*position: \[0, 118\.4, 22\], size: \[126, 4\.8, 36\])(?=[\s\S]*megaRoofFrame)[\s\S]*$/, 'src/megaGeometry.ts'],
+  ['P1 gate has connected longitudinal ribs, open-bottom frames and shoulder supports', /megaServiceBoxes[\s\S]*megaServicePlatforms[\s\S]*megaLongitudinalRibs[\s\S]*megaDoorFrames[\s\S]*megaServiceBraces/, 'src/megaGeometry.ts'],
+  ['P1 bridge details share the path and orient cross-caps, girders and sparse rail posts', /girders\.push[\s\S]*railPosts\.push[\s\S]*size: \[9, \.8, 1\.8\], rotation: \[0, angle, 0\]/, 'src/megaGeometry.ts'],
   ['P0 clearance is rendering-only and deterministic', /deriveMegaHeroClearance[\s\S]*clearedBuildingIds[\s\S]*visibleBuildings/, 'src/megaGeometry.ts'],
   ['P0 shadow camera covers the 96-unit hero without covering the whole city', /shadow-camera-left=\{-70\} shadow-camera-right=\{70\} shadow-camera-top=\{110\} shadow-camera-bottom=\{-25\}/, 'src/CityScene.tsx'],
   ['StableCity block contract', /city\.blocks\.length !== 16/, 'src/city.ts'],
@@ -46,6 +49,7 @@ const checks = [
   ['Run report version', /RUN_REPORT_VERSION = 'local-run-report\.v1'/, 'src/runReport.ts'],
   ['Run report schema guard', /runContext.*city.*runtime.*providers/s, 'src/runReport.ts'],
   ['Camera and orbit share the focal point', /camera\.lookAt\(\.\.\.cameraViews\[mode\]\.target\).*<OrbitControls[^>]*target=\{cameraViews\[mode\]\.target\}/s, 'src/CityScene.tsx'],
+  ['P1 Hero orbit allows its low-angle preset and camera reset synchronizes the controls target', /controls\.current\?\.target\.set\(\.\.\.target\)[\s\S]*controls\.current\?\.update\(\)[\s\S]*maxPolarAngle=\{mode === 'mega' \? 112 \* Math\.PI \/ 180 : Math\.PI \/ 2\.12\}/, 'src/CityScene.tsx'],
   ['Camera mode clears previous orbit damping', /<OrbitControls[^>]*key=\{mode\}/, 'src/CityScene.tsx'],
   ['Orbit controls remain available in visual scenes', /<OrbitControls[^>]*key=\{mode\}[^>]*makeDefault[^>]*target=\{cameraViews\[mode\]\.target\}/, 'src/CityScene.tsx'],
   ['Visual pages expose a camera reset action', /const resetCamera = \(\) => \{[\s\S]*setSceneResetKey\(value => value \+ 1\)[\s\S]*重置镜头/, 'src/App.tsx'],

@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
-import { Color, InstancedMesh, Object3D, type ShaderMaterial } from 'three'
+import { BufferGeometry, Color, Float32BufferAttribute, InstancedMesh, Object3D, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
 import { generateMetropolis, riverReflectionSources, riverShader } from './metropolis'
@@ -12,7 +12,7 @@ import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
 import { sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaBridgeGeometry, createMegaStructureGeometry } from './megaGeometry'
+import { createMegaBridgeGeometry, createMegaRoofVertices, createMegaStructureGeometry } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
@@ -109,18 +109,32 @@ function tintSeededItems(items: Box[], target: string, fallback: string): Box[] 
 function Megastructure({ theme }: { theme: ThemeName | null }) {
   const structure = useMemo(() => createMegaStructureGeometry(), [])
   const bridge = useMemo(() => createMegaBridgeGeometry(), [])
+  const roofGeometry = useMemo(() => {
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new Float32BufferAttribute(createMegaRoofVertices(), 3))
+    geometry.computeVertexNormals()
+    geometry.computeBoundingSphere()
+    return geometry
+  }, [])
+  useEffect(() => () => roofGeometry.dispose(), [roofGeometry])
   const spec = theme ? themeSpecs[theme] : null
   return <>
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} items={[
       ...structure.bodies,
+      ...structure.roofFrame,
+      ...structure.serviceBraces,
     ]} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={structure.braces} />
+    <mesh geometry={roofGeometry} castShadow receiveShadow>
+      <meshStandardMaterial color={spec?.megaBody ?? '#d4ccb1'} roughness={spec?.materialResponse.megaBody.roughness ?? .82} metalness={spec?.materialResponse.megaBody.metalness ?? .04} />
+    </mesh>
+    <Boxes color={spec?.trim ?? '#e2dac3'} roughness={spec?.materialResponse.megaRibs.roughness ?? .82} metalness={spec?.materialResponse.megaRibs.metalness ?? .04} items={[...structure.braces, ...structure.ribs]} />
     <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
       ...structure.inset,
+      ...structure.frames,
     ]} />
-    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, ...bridge.joints]} />
+    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, ...bridge.joints, ...bridge.girders]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
-    <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.rails} />
+    <Boxes color={spec?.trim ?? '#e2dac3'} items={[...bridge.rails, ...bridge.railPosts]} />
   </>
 }
 
@@ -348,12 +362,15 @@ function Transport({ night, count }: { night: boolean; count: number }) {
   </>
 }
 
-function CameraDirector({ mode }: { mode: CameraMode }) {
+function CameraDirector({ mode, controls }: { mode: CameraMode; controls: { current: ComponentRef<typeof OrbitControls> | null } }) {
   const { camera, size } = useThree()
   useLayoutEffect(() => {
     if ('aspect' in camera) camera.aspect = size.width / Math.max(1, size.height)
+    const target = cameraViews[mode].target
     camera.position.set(...cameraPosition(mode, size.width / size.height))
-    camera.lookAt(...cameraViews[mode].target)
+    camera.lookAt(...target)
+    controls.current?.target.set(...target)
+    controls.current?.update()
     camera.updateProjectionMatrix()
   }, [camera, mode, size.width, size.height])
   return null
@@ -449,7 +466,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
   >
     <color attach="background" args={[p.haze]} /><fog attach="fog" args={[fog.color, fog.near, fog.far]} />
     <Atmosphere time={time} weather={effectiveWeather} lowDetail={quality === 'low'} quality={quality} mood={mood} />
-    <CameraDirector mode={mode} />
+    <CameraDirector mode={mode} controls={controls} />
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)} />
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct * (.72 + (mood?.lightLevel ?? .55) * .28)} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-70} shadow-camera-right={70} shadow-camera-top={110} shadow-camera-bottom={-25} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
@@ -458,7 +475,7 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
     {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
     <Megastructure theme={enabled ? theme : null} /><Transport night={night} count={config.traffic} />
-    <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
+    <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={mode === 'mega' ? 112 * Math.PI / 180 : Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
     {(effectiveWeather === 'haze' || (mood?.fogLevel ?? 0) > .2) && <HeightFog color={fog.color} mode={mode} quality={quality} densityScale={Math.max(.2, (mood?.fogLevel ?? .62) / .62)} />}

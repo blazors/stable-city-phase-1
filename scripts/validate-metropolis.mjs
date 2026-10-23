@@ -23,8 +23,8 @@ const { createMegaBridgeGeometry, createMegaStructureGeometry, deriveMegaHeroCle
 const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
 const fasciaBounds = verticalBounds(megaRoofFascia), deckBounds = verticalBounds(megaRoofDeck)
 assert.equal(megaRoofSupportTop, 124, 'Hero structural top is 124 units')
-assert.equal(fasciaBounds.top, 118, 'middle roof fascia meets the top deck')
-assert.equal(deckBounds.top, megaRoofSupportTop, 'roof deck reaches the 124-unit cap')
+assert(Math.abs(fasciaBounds.bottom - 116) < 1e-9 && Math.abs(fasciaBounds.top - 120.8) < 1e-9, 'recessed equipment layer sits above the sloped eaves')
+assert(Math.abs(deckBounds.bottom - 121) < 1e-9 && Math.abs(deckBounds.top - 121.6) < 1e-9, 'thin roof cap remains below the sparse top frame')
 assert.deepEqual(Object.keys(weatherLighting), ['clear', 'haze', 'rain', 'snow'], 'four consolidated weather modes have lighting')
 for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(weatherLighting)) {
   const fog = sceneFog(time, weather, '#243c54')
@@ -47,7 +47,7 @@ for (const weather of Object.values(weatherLighting)) {
   assert(weather.fogFar > weather.fogNear && weather.fogNear > 100, 'fog preserves near-field receivers')
   for (const time of Object.values(timeLighting)) assert(time.hemisphere * weather.fill > .4 && time.fill > 0, 'lighting preserves silhouette fill in every state')
 }
-assert.deepEqual(cameraViews.hero, { position: [-104, 7, -202], target: [0, 59, 21], fov: 40 }, 'Hero camera matches P0 preset')
+assert.deepEqual(cameraViews.hero, { position: [-130, 8, -255], target: [0, 48, 21], fov: 40 }, 'Hero camera pulls back to reveal crown sky margin and the complete foundation')
 assert.deepEqual(cameraViews.overview, { position: [-210, 165, -225], target: [0, 40, 20], fov: 42 }, 'Overview camera matches P0 preset')
 assert.deepEqual(cameraViews.elevated, { position: [-150, 85, -165], target: [0, 54, 22], fov: 43 }, 'Elevated camera matches P0 preset')
 for (const mode of ['overview', 'mega', 'elevated']) {

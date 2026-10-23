@@ -97,7 +97,7 @@ assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaBody\.roughness \
 assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaRibs\.roughness \?\? \.82\} metalness=\{spec\?\.materialResponse\.megaRibs\.metalness \?\? \.04\}/, 'mega ribs keep Stage 9 defaults when Theme is OFF')
 assert.match(scene, /roughness=\{spec\?\.materialResponse\.megaInset\.roughness \?\? \.82\} metalness=\{spec\?\.materialResponse\.megaInset\.metalness \?\? \.04\}/, 'mega inset keeps Stage 9 defaults when Theme is OFF')
 assert.match(scene, /<Boxes color=\{spec\?\.megaBody/, 'theme material still applies to the replacement Mega body')
-assert.match(scene, /<Boxes color=\{spec\?\.megaBody \?\? '#d4ccb1'\} items=\{\[\.\.\.bridge\.decks, \.\.\.bridge\.joints\]\}/, 'theme baseline still applies to the new elevated road')
+assert.match(scene, /<Boxes color=\{spec\?\.megaBody \?\? '#d4ccb1'\} items=\{\[\.\.\.bridge\.decks, \.\.\.bridge\.joints, \.\.\.bridge\.girders\]\}/, 'theme baseline still applies to the elevated road and its girders')
 assert.doesNotMatch(scene, /visibleBodies|upperMasses|facadePanels|metropolis\.roofs|metropolis\.terraces|metropolis\.windows|warmWindows|coolWindows/, 'ordinary building, roof, terrace, and window batches are absent from P0 rendering')
 assert.doesNotMatch(scene, /<Architecture\b|<ThemeSignatureOverlay\b/, 'core architecture and decorative signature overlays are not mounted')
 assert.match(scene, /<Boxes items=\{lights\} color="#e9b779" glow night=\{night\} emissiveIntensity=\{night \? \.65 : \.06\} \/>/, 'waterfront lights remain below the core emission tier')
