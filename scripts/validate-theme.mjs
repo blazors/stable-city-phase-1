@@ -15,7 +15,7 @@ async function sourceModule(file) {
 const { themeSpecs } = await sourceModule('../src/theme.ts')
 const { buildThemeSignature } = await sourceModule('../src/themeSignature.ts')
 const { megaConfig } = await sourceModule('../src/sceneConfig.ts')
-const { timeLighting } = await sourceModule('../src/lighting.ts')
+const { timeLighting, megaPracticalLights, megaPracticalFixtures, megaPracticalTimeMultipliers, megaPracticalMoodMultiplier, megaPracticalSpotIntensity, megaPracticalStripIntensity } = await sourceModule('../src/lighting.ts')
 const scene = fs.readFileSync(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
 const signatureSource = fs.readFileSync(new URL('../src/themeSignature.ts', import.meta.url), 'utf8')
 const materialSlots = ['bodyLight', 'bodyDark', 'trim', 'glass', 'foliage', 'emission', 'megaBody', 'megaInset']
@@ -88,6 +88,41 @@ assert.deepEqual(timeLighting, {
   sunset: { hemisphere: .88, fill: .35 },
   night: { hemisphere: .84, fill: .30 },
 }, 'Stage 9 fill values preserve night and use the authored day/sunset reduction')
+assert.deepEqual(megaPracticalLights, [
+  { position: [-15, 87.4, 8], target: [-28, 40, 15], baseIntensity: 3200, angle: .35, distance: 80 },
+  { position: [15, 87.4, 8], target: [28, 40, 15], baseIntensity: 3200, angle: .35, distance: 80 },
+  { position: [-27, 40, 6], target: [-10, 88, 18], baseIntensity: 2200, angle: .36, distance: 80 },
+  { position: [27, 40, 6], target: [10, 88, 18], baseIntensity: 2200, angle: .36, distance: 80 },
+], 'four gate spots use authored sources, targets and grouped wash settings')
+assert.deepEqual(megaPracticalFixtures.slice(4, 6), [
+  { position: [-27.92, 44, 15], size: [.30, 80, .16], emissiveScale: 1 },
+  { position: [27.92, 44, 15], size: [.30, 80, .16], emissiveScale: 1 },
+], 'vertical aperture strips project into the opening and connect to the header strip')
+assert.deepEqual(megaPracticalTimeMultipliers, { day: .1, sunset: .55, night: 1 }, 'practical lights keep the authored day/sunset/night tiers')
+assert(megaPracticalMoodMultiplier(.9) > megaPracticalMoodMultiplier(.28) && megaPracticalMoodMultiplier(0) > 0, 'mood dims or raises practicals without extinguishing them')
+assert.equal(megaPracticalSpotIntensity('night', .55, megaPracticalLights[0].baseIntensity), 3200 * megaPracticalMoodMultiplier(.55), 'upper down-wash keeps its nighttime baseline')
+assert.equal(megaPracticalSpotIntensity('night', .55, megaPracticalLights[2].baseIntensity), 2200 * megaPracticalMoodMultiplier(.55), 'lower up-wash keeps its nighttime baseline')
+assert(Math.abs(megaPracticalSpotIntensity('day', .55, megaPracticalLights[0].baseIntensity) / megaPracticalSpotIntensity('night', .55, megaPracticalLights[0].baseIntensity) - .1) < 1e-12, 'spotlights keep their daylight multiplier')
+assert(Math.abs(megaPracticalSpotIntensity('sunset', .55, megaPracticalLights[0].baseIntensity) / megaPracticalSpotIntensity('night', .55, megaPracticalLights[0].baseIntensity) - .55) < 1e-12, 'spotlights keep their sunset multiplier')
+assert(megaPracticalSpotIntensity('night', .9) > megaPracticalSpotIntensity('night', .28), 'mood light level drives the four physical spots')
+assert(megaPracticalStripIntensity('night', 0) >= 1.3 && megaPracticalStripIntensity('night', 1) <= 2.2, 'primary strips remain in the authored 1.3–2.2 night range')
+assert.equal(megaPracticalFixtures.length, 12, 'one shared practical batch contains four sources, aperture strips, mounts and three secondary strips')
+assert.equal(megaPracticalFixtures.filter(item => item.emissiveScale === .25).length, 3, 'service-platform and bridge strips emit at quarter strength')
+assert(megaPracticalFixtures.every(({ position, size }) => [...position, ...size].every(Number.isFinite)), 'practical fixture transforms stay finite')
+for (const weather of ['clear', 'haze', 'rain', 'snow']) {
+  for (const time of ['day', 'sunset', 'night']) {
+    assert(megaPracticalLights.every(light => megaPracticalSpotIntensity(time, .55, light.baseIntensity) > 0) && megaPracticalStripIntensity(time, .55) > 0, `${weather}/${time} keeps practical sources alive`)
+  }
+}
+const practicalComponent = scene.match(/function MegaPracticalLights[\s\S]*?\n}\n\nfunction Water/)?.[0] ?? ''
+assert.equal((practicalComponent.match(/<Boxes\b/g) ?? []).length, 1, 'all visible practical fixtures share one instanced batch')
+assert.match(practicalComponent, /targets\.forEach\(target => scene\.add\(target\)\)[\s\S]*return \(\) => targets\.forEach\(target => scene\.remove\(target\)\)/, 'spot targets are registered with and removed from the actual scene')
+assert.match(practicalComponent, /distance=\{megaPracticalLights\[index\]\.distance\} angle=\{megaPracticalLights\[index\]\.angle\} penumbra=\{\.75\} decay=\{2\} castShadow=\{false\}/, 'each local spot uses grouped cone/range settings, quadratic falloff and no shadow map')
+assert.match(practicalComponent, /theme \? themeSpecs\[theme\]\.emission : '#FFC681'\), \.38\)/, 'practical source hue mixes 38% of the active theme emission into its warm base')
+assert.match(practicalComponent, /emissiveIntensity=\{megaPracticalStripIntensity\(time, lightLevel\)\} emissiveInstanceColor/, 'main and secondary strips use the shared emissive-scale batch')
+assert.match(scene, /totalEmissiveRadiance \*= vColor/, 'per-instance linear color scales emissive output without another material batch')
+assert.match(scene, /<Megastructure theme=\{enabled \? theme : null\} \/><MegaPracticalLights time=\{time\} theme=\{enabled \? theme : null\} mood=\{mood\} \/><Transport/, 'practicals remain mounted across weather states and respect Theme OFF')
+assert.doesNotMatch(scene, /MegaPracticalHalo|megaPracticalPositions/, 'the suspended legacy practical rig stays removed')
 const mix = Number(scene.match(/const themeMix = ([\d.]+)/)?.[1])
 assert(mix >= .2 && mix <= .3, 'outskirts receive 20–30% theme mixing')
 assert.match(scene, /color\.setHSL\([\s\S]*?hsl\.l\)/, 'outskirts keep the original seed lightness')

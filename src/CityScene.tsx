@@ -11,7 +11,7 @@ import { LensWeather } from './LensWeather'
 import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
-import { sceneFog, timeLighting, weatherLighting } from './lighting'
+import { megaPracticalFixtures, megaPracticalLights, megaPracticalSpotIntensity, megaPracticalStripIntensity, sceneFog, timeLighting, weatherLighting } from './lighting'
 import { createMegaBridgeGeometry, createMegaRoofVertices, createMegaStructureGeometry } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
@@ -30,7 +30,7 @@ const snowSurfaces = [
 ]
 export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
-type Box = { position: Vec3; size: Vec3; color?: string; tower?: boolean; rotation?: Vec3; quaternion?: [number, number, number, number] }
+type Box = { position: Vec3; size: Vec3; color?: string; emissiveScale?: number; tower?: boolean; rotation?: Vec3; quaternion?: [number, number, number, number] }
 export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number; sampleDurationMs: number; configRevision: number }
 export type SceneCanvasHandle = { capture: () => Promise<{ blob: Blob; width: number; height: number }>; camera: () => { position: [number, number, number]; target: [number, number, number]; fov: number } }
 type CanvasMetrics = Omit<RenderMetrics, 'configRevision'>
@@ -50,7 +50,7 @@ const qualityConfig: Record<QualityPreset, { detail: number; traffic: number; wa
 }
 
 // Shared geometry/material batches keep architectural detail inexpensive.
-function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false, wet = false, roughness, metalness, emissive, emissiveIntensity, castShadow, receiveShadow }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean; wet?: boolean; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number; castShadow?: boolean; receiveShadow?: boolean }) {
+function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage = false, wet = false, roughness, metalness, emissive, emissiveIntensity, castShadow, receiveShadow, emissiveInstanceColor = false }: { items: Box[]; color?: string; glow?: boolean; night?: boolean; foliage?: boolean; wet?: boolean; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number; castShadow?: boolean; receiveShadow?: boolean; emissiveInstanceColor?: boolean }) {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     if (!ref.current) return
@@ -62,7 +62,9 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
       object.scale.set(...item.size)
       object.updateMatrix()
       ref.current!.setMatrixAt(i, object.matrix)
-      ref.current!.setColorAt(i, new Color(item.color ?? '#ffffff'))
+      const instanceColor = new Color(item.color ?? '#ffffff')
+      if (item.emissiveScale !== undefined) instanceColor.multiplyScalar(item.emissiveScale)
+      ref.current!.setColorAt(i, instanceColor)
     })
     ref.current.instanceMatrix.needsUpdate = true
     if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true
@@ -70,7 +72,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
   }, [items])
   return <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow={castShadow ?? !glow} receiveShadow={receiveShadow ?? !glow}>
     {foliage ? <icosahedronGeometry args={[.65, 1]} /> : <boxGeometry />}
-    <meshStandardMaterial color={color} roughness={roughness ?? (glow ? .45 : wet ? .22 : .82)} metalness={metalness ?? (glow ? .15 : wet ? .10 : .04)} emissive={emissive ?? (glow ? color : '#000000')} emissiveIntensity={emissiveIntensity ?? (glow ? (night ? 1.8 : .08) : 0)} />
+    <meshStandardMaterial color={color} roughness={roughness ?? (glow ? .45 : wet ? .22 : .82)} metalness={metalness ?? (glow ? .15 : wet ? .10 : .04)} emissive={emissive ?? (glow ? color : '#000000')} emissiveIntensity={emissiveIntensity ?? (glow ? (night ? 1.8 : .08) : 0)} onBeforeCompile={emissiveInstanceColor ? shader => { shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n\ttotalEmissiveRadiance *= vColor;') } : undefined} />
   </instancedMesh>
 }
 
@@ -135,6 +137,30 @@ function Megastructure({ theme }: { theme: ThemeName | null }) {
     <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, ...bridge.joints, ...bridge.girders]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={[...bridge.rails, ...bridge.railPosts]} />
+  </>
+}
+
+function MegaPracticalLights({ time, theme, mood }: { time: TimeOfDay; theme: ThemeName | null; mood: ResolvedMood | undefined }) {
+  const scene = useThree(state => state.scene)
+  const targets = useMemo(() => megaPracticalLights.map(light => {
+    const target = new Object3D()
+    target.position.set(light.target[0], light.target[1], light.target[2])
+    return target
+  }), [])
+  useLayoutEffect(() => {
+    targets.forEach(target => scene.add(target))
+    return () => targets.forEach(target => scene.remove(target))
+  }, [scene, targets])
+  const lightColor = useMemo(() => new Color('#FFC681').lerp(new Color(theme ? themeSpecs[theme].emission : '#FFC681'), .38).getStyle(), [theme])
+  const fixtures = useMemo(() => megaPracticalFixtures.map(fixture => ({
+    position: [...fixture.position] as Vec3,
+    size: [...fixture.size] as Vec3,
+    emissiveScale: fixture.emissiveScale,
+  })), [])
+  const lightLevel = mood?.monumentalLights ?? mood?.lightLevel ?? .55
+  return <>
+    {targets.map((target, index) => <spotLight key={`mega-practical-${index}`} position={[...megaPracticalLights[index].position] as Vec3} target={target} color={lightColor} intensity={megaPracticalSpotIntensity(time, lightLevel, megaPracticalLights[index].baseIntensity)} distance={megaPracticalLights[index].distance} angle={megaPracticalLights[index].angle} penumbra={.75} decay={2} castShadow={false} />)}
+    <Boxes items={fixtures} color={lightColor} emissive={lightColor} glow emissiveIntensity={megaPracticalStripIntensity(time, lightLevel)} emissiveInstanceColor castShadow={false} receiveShadow={false} />
   </>
 }
 
@@ -474,11 +500,11 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={effectiveWeather} quality={quality} />
     {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
     {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
-    <Megastructure theme={enabled ? theme : null} /><Transport night={night} count={config.traffic} />
+    <Megastructure theme={enabled ? theme : null} /><MegaPracticalLights time={time} theme={enabled ? theme : null} mood={mood} /><Transport night={night} count={config.traffic} />
     <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={mode === 'mega' ? 112 * Math.PI / 180 : Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
-    {(effectiveWeather === 'haze' || (mood?.fogLevel ?? 0) > .2) && <HeightFog color={fog.color} mode={mode} quality={quality} densityScale={Math.max(.2, (mood?.fogLevel ?? .62) / .62)} />}
+    {(effectiveWeather === 'haze' || (mood?.fogLevel ?? 0) > .2) && <HeightFog color={fog.color} mode={mode} quality={quality} densityScale={Math.max(.2, (mood?.fogLevel ?? .62) / .62) * (mode === 'mega' ? .0625 : 1)} />}
     <Metrics startedAt={startedAt.current} onUpdate={onUpdate} onReady={onReady} />
   </Canvas>
 }

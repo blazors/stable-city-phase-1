@@ -272,6 +272,7 @@ assert.match(heightFog, /preference\.removeEventListener\('change', update\)/, '
 assert.doesNotMatch(heightFog, /RenderTarget|DepthTexture|<mesh|setInterval|Math\.random/, 'analytic layer allocates no passes, geometry or CPU particles')
 assert.match(scene, /effectiveWeather === 'haze' \|\| \(mood\?\.fogLevel \?\? 0\) > \.2\)[\s\S]*<HeightFog color=\{fog.color\} mode=\{mode\} quality=\{quality\}/, 'weather haze and mood fog share the same layer integration')
 assert.match(scene, /applyHeightFog\(mix\(water/, 'water shader receives the same height fog')
+assert.match(scene, /densityScale=\{Math\.max\(\.2, \(mood\?\.fogLevel \?\? \.62\) \/ \.62\) \* \(mode === 'mega' \? \.0625 : 1\)\}/, 'Mega Hero uses sparse height fog while other camera/weather scales remain unchanged')
 const atmosphere = fs.readFileSync(new URL('../src/Atmosphere.tsx', import.meta.url), 'utf8')
 assert.match(atmosphere, /lowFrequencySun = 0\.0/, 'clouds keep an explicit optional low-frequency sun sample')
 assert.match(atmosphere, /if \(uDetail > 1\.5\)/, 'only HIGH\/AUTO clouds spend the extra sun-direction sample')
