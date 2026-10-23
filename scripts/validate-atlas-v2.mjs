@@ -1,142 +1,138 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import ts from 'typescript'
-import { Vector3 } from 'three'
+import { Euler, Quaternion, Vector3 } from 'three'
 
 const transpile = source => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
 const moduleFrom = output => import(`data:text/javascript;base64,${Buffer.from(output).toString('base64')}`)
-const configUrl = `data:text/javascript;base64,${Buffer.from(transpile(await readFile(new URL('../src/sceneConfig.ts', import.meta.url), 'utf8'))).toString('base64')}`
-const { sceneConfig } = await moduleFrom(transpile(await readFile(new URL('../src/sceneConfig.ts', import.meta.url), 'utf8')))
+const configSource = await readFile(new URL('../src/sceneConfig.ts', import.meta.url), 'utf8')
+const configUrl = `data:text/javascript;base64,${Buffer.from(transpile(configSource)).toString('base64')}`
+const { sceneConfig } = await moduleFrom(transpile(configSource))
 const resolveThree = `from '${import.meta.resolve('three')}'`
-const camera = await moduleFrom(transpile((await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8')).replace(/from (['"])three\1/g, resolveThree).replace(/from (['"])\.\/sceneConfig\1/g, `from '${configUrl}'`)))
-const mega = await moduleFrom(transpile((await readFile(new URL('../src/megaGeometry.ts', import.meta.url), 'utf8')).replace(/from (['"])three\1/g, resolveThree).replace(/from (['"])\.\/sceneConfig\1/g, `from '${configUrl}'`)))
-const city = await moduleFrom(transpile(await readFile(new URL('../src/city.ts', import.meta.url), 'utf8')))
+const cameraSource = (await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8'))
+  .replace(/from (['"])three\1/g, resolveThree)
+  .replace(/from (['"])\.\/sceneConfig\1/g, `from '${configUrl}'`)
+const camera = await moduleFrom(transpile(cameraSource))
+const megaSource = (await readFile(new URL('../src/megaGeometry.ts', import.meta.url), 'utf8'))
+  .replace(/from (['"])\.\/sceneConfig\1/g, `from '${configUrl}'`)
+const mega = await moduleFrom(transpile(megaSource))
+const citySource = await readFile(new URL('../src/city.ts', import.meta.url), 'utf8')
+const city = await moduleFrom(transpile(citySource))
 
 const config = sceneConfig.mega
 const structure = mega.createMegaStructureGeometry()
 const bridge = mega.createMegaBridgeGeometry()
-assert.deepEqual(config.dimensions, { width: 140, height: 124, depth: 50 }, 'mega overall dimensions are 140 x 124 x 50')
-assert.deepEqual(config.center, [0, 62, 21], 'mega center is authored at [0,62,21]')
-assert.deepEqual(config.gate, { width: 64, height: 92, depth: 40 }, 'portal clear opening is 64 x 92 x 40')
-assert.equal(structure.inset.length, 0, 'portal has no rear wall or inset solids')
-assert.deepEqual(structure.bodies.slice(0, 2).map(item => item), [
-  { position: [-42, 53, 20], size: [20, 78, 40] }, { position: [42, 53, 20], size: [20, 78, 40] },
-], 'main piers retain the authored x ±42 dimensions and position')
-assert.deepEqual(structure.bodies.slice(2, 4).map(item => item), [
-  { position: [-55, 7, 20], size: [26, 14, 44] }, { position: [55, 7, 20], size: [26, 14, 44] },
-], 'expanded bases retain the authored x ±55 dimensions and position')
-assert.deepEqual(structure.bodies.slice(4, 7).map(item => item), [
-  { position: [0, 97, 20], size: [124, 10, 40] }, mega.megaRoofFascia, mega.megaRoofDeck,
-], 'three roof tiers meet continuously and the roof aliases reference those same boxes')
-assert.equal(mega.megaRoofFascia.position[1] - mega.megaRoofFascia.size[1] / 2, 102, 'second crown tier starts exactly at the first tier top')
-assert.equal(mega.megaRoofDeck.position[1] - mega.megaRoofDeck.size[1] / 2, 118, 'upper roof deck starts exactly at the fascia top')
-assert.equal(structure.braces.filter(item => item.size[0] === 8 && item.size[1] === 84.853).length, 4, 'four long diagonal piers use the authored section')
-assert.equal(structure.braces.filter(item => item.size[1] === 100 && item.size[0] === 1.4).length, 16, 'front and rear facades use eight full-height ribs each')
-assert.equal(structure.braces.filter(item => item.position[1] === 110 && item.size[1] === 16).length, 7, 'crown face receives seven full-depth ribs')
-const corridors = structure.braces.filter(item => item.position[1] === 18 && item.size[0] === 8 && item.size[1] === 1.2)
-assert.deepEqual(corridors.map(item => item.position[0]), [-28, 28], 'paired internal side corridors sit along both inner faces')
-assert(corridors.every(item => item.position[2] + item.size[2] / 2 === 36), 'inner corridors meet the rear platform without overlapping it')
-const rearPlatform = structure.bodies.filter(item => item.position[1] === 18 && item.position[2] === 41 && item.size[1] === 1.2)
-assert.deepEqual(rearPlatform.map(item => [item.position[0] - item.size[0] / 2, item.position[0] + item.size[0] / 2]), [[-32, 8.5], [15.5, 32]], 'rear platform leaves the 7-unit bridge lane clear without losing either side landing')
-assert(bridge.decks.length > config.bridgePath.length - 1, 'bridge deck follows the path to its landing and adds turn plates')
-assert.equal(bridge.decks.filter(item => item.size[0] === 7.2 && item.size[1] === 1.2 && item.size[2] === 7.2).length, 4, 'all four bridge turns receive 7.2-unit joint plates')
-assert(bridge.rails.length === (config.bridgePath.length - 1) * 2, 'bridge has two continuous rail edges')
-const bridgePiers = bridge.supports.filter(item => item.size[0] === 1.4)
-const bridgeCrossheads = bridge.supports.filter(item => item.size[1] === 1)
-assert.equal(bridgePiers.length, 7, 'seven bridge piers reach the ground')
-const endpoint = config.bridgePath.at(-1)
-assert(Math.abs(endpoint[0]) < config.portalWidth / 2, 'bridge endpoint enters portal width')
-assert(config.bridgePath.some(([, , z]) => z > config.frontZ && z < config.frontZ + config.gate.depth), 'bridge path enters the gate tunnel')
-assert(Math.abs(bridge.platform.position[2] - endpoint[2]) <= bridge.platform.size[2] / 2, 'bridge endpoint lands on the interior platform')
-assert.deepEqual(bridge.platform, { position: [12, 18, 62], size: [18, 1.2, 14] }, 'bridge lands on the authored end platform')
-const finalDeck = bridge.decks[config.bridgePath.length - 2]
-assert.equal(finalDeck.position[2] + finalDeck.size[2] / 2, bridge.platform.position[2] - bridge.platform.size[2] / 2, 'final deck meets the landing edge without coplanar overlap')
-assert.equal(bridge.decks[0].size[1], 1.2, 'bridge deck thickness is 1.2')
-assert(bridge.rails.every(item => item.size[0] === .25 && item.size[1] === .45), 'bridge rails keep the authored slim section')
-assert(bridge.rails.every(item => Math.abs(item.position[1] - .225 - 18 - .6) < 1e-9), 'bridge rails sit directly on the deck edges')
-const railSegmentEnds = item => {
+assert.deepEqual(config.dimensions, { width: 180, height: 124, depth: 104 }, 'gate envelope is approximately 180 x 124 x 104')
+assert.deepEqual(config.center, [0, 62, 22], 'gate remains centered at [0,62,22]')
+assert.deepEqual(config.gate, { width: 56, height: 88, depth: 40 }, 'clear through opening is 56 x 88 x 40')
+assert.deepEqual(structure.bodies.slice(0, 2).map(({ position, size }) => ({ position, size })), [
+  { position: [-43, 44, 22], size: [30, 88, 40] },
+  { position: [43, 44, 22], size: [30, 88, 40] },
+], 'main gate piers preserve the authored P0 sections')
+assert.deepEqual(structure.bodies[2], { position: [0, 97, 22], size: [116, 18, 40], rotation: undefined, quaternion: undefined }, 'main crossbeam meets both piers at y=88')
+assert.deepEqual(structure.bodies[3], { position: [0, 109, 22], size: [124, 6, 42], rotation: undefined, quaternion: undefined }, 'lower crown tier uses the narrowed footprint')
+assert.deepEqual(mega.megaRoofFascia.size, [140, 8, 50], 'middle crown tier steps out from the lower crown')
+assert.deepEqual(mega.megaRoofDeck.size, [126, 8, 38], 'upper crown tier steps in again and reaches y=124')
+assert.equal(mega.megaRoofDeck.position[1] + mega.megaRoofDeck.size[1] / 2, 124, 'crown reaches the 124-unit cap')
+assert(structure.bodies.some(item => item.position.join(',') === '-70,3,22' && item.size.join(',') === '40,6,104'), 'left foundation has the specified P0 base')
+assert(structure.bodies.some(item => item.position.join(',') === '70,3,22' && item.size.join(',') === '40,6,104'), 'right foundation mirrors the P0 base')
+
+const legs = structure.braces
+assert.equal(legs.length, 4, 'four long sloping supports use single boxes')
+assert(legs.every(leg => leg.quaternion && leg.size[1] > 75), 'all four supports use quaternion-oriented full-length members')
+const endpointsFor = leg => {
+  const [x, y, z] = leg.position
+  const axis = new Vector3(0, 1, 0).applyQuaternion(new Quaternion(...leg.quaternion)).multiplyScalar(leg.size[1] / 2)
+  return [[x - axis.x, y - axis.y, z - axis.z], [x + axis.x, y + axis.y, z + axis.z]]
+}
+const expectedLegEnds = [
+  [[-78, 6, -22], [-55, 78, 5]], [[-78, 6, 66], [-55, 78, 39]],
+  [[78, 6, -22], [55, 78, 5]], [[78, 6, 66], [55, 78, 39]],
+]
+for (const target of expectedLegEnds) {
+  const leg = legs.find(candidate => endpointsFor(candidate).every(point => target.some(endpoint => new Vector3(...point).distanceTo(new Vector3(...endpoint)) < 1e-6)))
+  assert(leg, `a single diagonal member joins ${target[0].join(',')} to ${target[1].join(',')}`)
+  assert(endpointsFor(leg).some(point => Math.abs(point[1] - 6) < 1e-6), 'lower leg end meets the foundation top at y=6')
+}
+
+assert.deepEqual(config.bridgePath, [[-175, 18, -54], [-120, 18, -44], [-80, 18, -34], [-32, 18, -18], [32, 18, -18], [80, 18, -34], [120, 18, -44], [175, 18, -54]], 'elevated traffic path crosses the gate front without a portal turn')
+assert.equal(bridge.decks.length, config.bridgePath.length - 1, 'each continuous bridge segment has one deck')
+assert(bridge.decks.every(deck => deck.size[0] === 8 && deck.size[1] === 1.6), 'bridge deck is 8 wide and 1.6 thick')
+assert.equal(bridge.joints.length, config.bridgePath.length - 2, 'deck joints bridge every angled path node')
+assert(bridge.joints.every((joint, index) => joint.size.join(',') === '8.8,1.6,8.8' && joint.position.join(',') === config.bridgePath[index + 1].join(',')), 'one low-profile plate closes each road seam')
+assert.equal(bridge.rails.length, (config.bridgePath.length - 1) * 2, 'two rail runs cover every bridge segment')
+const railEnds = item => {
   const [x, y, z] = item.position, angle = item.rotation[1], half = item.size[2] / 2
   const direction = [Math.sin(angle) * half, Math.cos(angle) * half]
   return [[x - direction[0], y, z - direction[1]], [x + direction[0], y, z + direction[1]]]
 }
 for (let side = 0; side < 2; side++) for (let segment = 0; segment < config.bridgePath.length - 2; segment++) {
-  const [, end] = railSegmentEnds(bridge.rails[side * (config.bridgePath.length - 1) + segment])
-  const [start] = railSegmentEnds(bridge.rails[side * (config.bridgePath.length - 1) + segment + 1])
-  assert(Math.hypot(end[0] - start[0], end[2] - start[2]) < 1e-6, 'adjacent rail segments share their exact mitered turn point')
+  const [, end] = railEnds(bridge.rails[side * (config.bridgePath.length - 1) + segment])
+  const [start] = railEnds(bridge.rails[side * (config.bridgePath.length - 1) + segment + 1])
+  assert(new Vector3(...end).distanceTo(new Vector3(...start)) < 1e-6, 'adjacent rail members meet without gaps')
 }
-assert(bridge.supports.every(item => item.size[0] === 1.4 || item.position[1] === 16.9), 'bridge supports use grounded piers and under-deck crossheads')
-assert(bridgePiers.every(item => item.position[1] - item.size[1] / 2 === 0), 'every bridge pier reaches grade')
-assert(bridgePiers.every(item => item.position[1] + item.size[1] / 2 === 16.4), 'every bridge pier meets its crosshead without penetrating it')
-assert(bridgeCrossheads.every(item => item.position[1] - item.size[1] / 2 === 16.4 && item.position[1] + item.size[1] / 2 === 17.4), 'crossheads connect pier tops to deck undersides without overlap')
-assert(endpoint[2] > config.frontZ + config.dimensions.depth, 'bridge extends through and beyond the rear facade')
+const piers = bridge.supports.filter(item => item.size[0] === 1.8)
+assert(piers.every(item => item.position[1] - item.size[1] / 2 === 0 && item.position[1] + item.size[1] / 2 === 17.2), 'all outer bridge piers reach grade and meet the deck support')
+assert(piers.every(item => Math.abs(item.position[0]) - item.size[0] / 2 > config.gate.width / 2), 'bridge piers stay fully outside the portal opening')
+const roadZAtX = x => {
+  const index = config.bridgePath.findIndex((node, i) => i < config.bridgePath.length - 1 && x >= node[0] && x <= config.bridgePath[i + 1][0])
+  const from = config.bridgePath[index], to = config.bridgePath[index + 1]
+  return from[2] + (to[2] - from[2]) * (x - from[0]) / (to[0] - from[0])
+}
+assert(piers.every(pier => Math.abs(pier.position[2] - roadZAtX(pier.position[0])) < 1e-9), 'each pier stays directly beneath the sloped road alignment')
+assert(!('platform' in bridge), 'new lateral road has no legacy interior landing platform')
 
-const visibleBuildings = mega.deriveMegaHeroClearance(city.createStableCity()).visibleBuildings
-const clearAt = (x, z, radius = 3.2) => visibleBuildings.every(building =>
-  Math.abs(x - building.x) > radius + building.width / 2 || Math.abs(z - building.z) > radius + building.depth / 2)
-for (let i = 0; i < config.bridgePath.length - 1; i++) {
-  const from = config.bridgePath[i], to = config.bridgePath[i + 1]
-  for (let step = 0; step <= 10; step++) {
-    const t = step / 10
-    const sampleX = from[0] + (to[0] - from[0]) * t, sampleZ = from[2] + (to[2] - from[2]) * t
-    const blocking = visibleBuildings.find(building => Math.abs(sampleX - building.x) <= 3.2 + building.width / 2 && Math.abs(sampleZ - building.z) <= 3.2 + building.depth / 2)
-    assert(!blocking, `bridge keeps clearance from visible ordinary buildings at ${sampleX},${sampleZ}${blocking ? ` (${blocking.x},${blocking.z})` : ''}`)
+const obbIntersects = (a, b) => {
+  const quat = item => item.quaternion ? new Quaternion(...item.quaternion) : new Quaternion().setFromEuler(new Euler(...(item.rotation ?? [0, 0, 0])))
+  const axes = item => [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)].map(axis => axis.applyQuaternion(quat(item)))
+  const axesA = axes(a), axesB = axes(b)
+  const halfA = a.size.map(value => value / 2), halfB = b.size.map(value => value / 2)
+  const delta = new Vector3(...b.position).sub(new Vector3(...a.position))
+  const candidates = [...axesA, ...axesB, ...axesA.flatMap(axisA => axesB.map(axisB => new Vector3().crossVectors(axisA, axisB)))]
+  return candidates.every(axis => {
+    if (axis.lengthSq() < 1e-10) return true
+    axis.normalize()
+    const radius = (basis, half) => basis.reduce((sum, direction, index) => sum + half[index] * Math.abs(axis.dot(direction)), 0)
+    return Math.abs(delta.dot(axis)) < radius(axesA, halfA) + radius(axesB, halfB) - 1e-6
+  })
+}
+assert([...bridge.decks, ...bridge.joints].every(deck => legs.every(leg => !obbIntersects(deck, leg))), 'bridge deck and joints stay separated from all four diagonal legs')
+assert(piers.every(pier => pier.position[0] - pier.size[0] / 2 > -28 || pier.position[0] + pier.size[0] / 2 < 28), 'no thick bridge pier intrudes into the clear central portal')
+
+const occupied = [...structure.bodies, ...structure.inset, ...structure.braces, ...bridge.decks, ...bridge.joints, ...bridge.rails, ...bridge.supports]
+const portalContains = point => point[0] > -28 && point[0] < 28 && point[1] > 0 && point[1] < 88 && point[2] > 2 && point[2] < 42
+for (let x = -27; x <= 27; x += 3) for (let y = 1; y < 88; y += 3) for (let z = 3; z < 42; z += 3) {
+  const point = [x, y, z]
+  for (const item of occupied) {
+    const relative = new Vector3(x - item.position[0], y - item.position[1], z - item.position[2])
+    if (item.quaternion) relative.applyQuaternion(new Quaternion(...item.quaternion).invert())
+    else if (item.rotation) relative.applyEuler(new Euler(...item.rotation))
+    const inside = Math.abs(relative.x) < item.size[0] / 2 && Math.abs(relative.y) < item.size[1] / 2 && Math.abs(relative.z) < item.size[2] / 2
+    assert(!(portalContains(point) && inside), `solid ${JSON.stringify(item)} does not occupy portal interior at ${point}`)
   }
 }
+assert.equal(structure.inset.length, 0, 'portal has no rear wall or inset solids')
+const boxCount = occupied.length
+assert(boxCount <= 110 && boxCount * 12 <= 1320, 'P0 geometry remains under the 110-box / 1,320-triangle budget')
 
-const elevatedCamera = camera.createSceneCamera('elevated')
-assert.deepEqual(camera.cameraViews.hero, { position: [-68, 14, -196], target: [-6, 62, 20], fov: 44 }, 'Hero camera uses the fixed authored 16:9 composition')
-const heroCamera = camera.createSceneCamera('hero')
-heroCamera.aspect = 16 / 9
-heroCamera.position.set(...camera.cameraPosition('hero', 16 / 9))
-heroCamera.lookAt(...camera.cameraViews.hero.target)
-heroCamera.updateProjectionMatrix()
-heroCamera.updateMatrixWorld()
-const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
-const heroElevation = Math.atan2(camera.cameraViews.hero.target[1] - camera.cameraViews.hero.position[1], Math.hypot(camera.cameraViews.hero.position[0] - camera.cameraViews.hero.target[0], camera.cameraViews.hero.position[2] - camera.cameraViews.hero.target[2])) * 180 / Math.PI
-assert(heroElevation >= 0 && heroElevation < 20, `hero camera keeps the authored upward viewing angle (got ${heroElevation.toFixed(2)})`)
-assert.deepEqual(camera.cameraPosition('hero', .5), camera.cameraViews.hero.position, 'Hero camera is not dolly-adapted to a narrow outer slot')
-const projectedBox = (x0, x1, y0, y1, z0, z1) => [x0, x1].flatMap(x => [y0, y1].flatMap(y => [z0, z1].map(z => heroProject(x, y, z))))
-const entityProjected = projectedBox(-70, 70, 0, 124, -4, 46)
-const entityWidthShare = (Math.max(...entityProjected.map(point => point.x)) - Math.min(...entityProjected.map(point => point.x))) / 2
-const entityHeightShare = (Math.max(...entityProjected.map(point => point.y)) - Math.min(...entityProjected.map(point => point.y))) / 2
-assert(entityWidthShare >= .45 && entityWidthShare <= .55, `Hero entity occupies 45-55% frame width (got ${entityWidthShare.toFixed(3)})`)
-assert(entityHeightShare >= .75 && entityHeightShare <= .85, `Hero entity occupies 75-85% frame height (got ${entityHeightShare.toFixed(3)})`)
-assert(entityProjected.every(point => Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1), 'complete Hero entity remains inside the 16:9 frame')
-const gateProjected = projectedBox(-32, 32, 0, 92, 0, 40)
-assert(gateProjected.every(point => Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1), 'actual 64 x 92 x 40 gate clearance remains in frame')
-const opening = { x: [-32, 32], y: [0, 92], z: [0, 40] }
-for (const item of [...structure.bodies.slice(0, 13), ...structure.inset]) {
-  const [x, y, z] = item.position, [w, h, d] = item.size
-  assert(x + w / 2 <= opening.x[0] || x - w / 2 >= opening.x[1] || y + h / 2 <= opening.y[0] || y - h / 2 >= opening.y[1] || z + d / 2 <= opening.z[0] || z - d / 2 >= opening.z[1], `exterior solid preserves the through-opening: ${JSON.stringify(item)}`)
-}
-for (const item of [...structure.bodies, ...structure.inset, ...structure.braces]) {
-  const [x, y, z] = item.position, [w, h, d] = item.size
-  assert(Math.abs(x) - w / 2 >= 24 || y + h / 2 <= 20 || y - h / 2 >= 92 || z + d / 2 <= 0 || z - d / 2 >= 36, `central volume above the interior bridge remains open: ${JSON.stringify(item)}`)
-}
-for (const [x, y, z] of config.bridgePath) {
-  const projected = heroProject(x, y + .5, z)
-  assert(!(projected.x > .25 && projected.y < -.45), 'hero bridge stays out of the lower-right scene-caption safe zone')
-}
-for (const [x, , z] of config.bridgePath) {
-  if (z > 0 && z < 40) assert(Math.abs(x) < config.portalWidth / 2 - 3.5, 'bridge keeps its 7-unit deck clear of portal pillars')
-}
-assert.deepEqual(camera.cameraViews.elevated, { position: [-125, 63, -155], target: [0, 37, 18], fov: 46 }, 'Elevated camera matches authored composition')
-elevatedCamera.aspect = 1280 / 720
-elevatedCamera.position.set(...camera.cameraPosition('elevated', elevatedCamera.aspect))
-elevatedCamera.lookAt(...camera.cameraViews.elevated.target)
-elevatedCamera.updateProjectionMatrix()
-for (const [x, y, z] of config.bridgePath) {
-  const projected = new Vector3(x, y + .5, z).project(elevatedCamera)
-  assert(!(projected.x < -.25 && projected.y < -.45), 'bridge stays out of the lower-left scene-caption safe zone')
-}
+assert.deepEqual(camera.cameraViews.hero, { position: [-104, 7, -202], target: [0, 59, 21], fov: 40 }, 'Hero camera matches P0 preset')
+assert.deepEqual(camera.cameraViews.overview, { position: [-210, 165, -225], target: [0, 40, 20], fov: 42 }, 'Overview camera matches P0 preset')
+assert.deepEqual(camera.cameraViews.elevated, { position: [-150, 85, -165], target: [0, 54, 22], fov: 43 }, 'Elevated camera matches P0 preset')
+for (const mode of ['overview', 'mega', 'elevated']) assert.deepEqual(camera.createSceneCamera(mode).position.toArray(), camera.cameraViews[mode].position, `${mode} camera starts at its preset`)
+assert.deepEqual(camera.cameraPosition('mega', .5), camera.cameraViews.mega.position, 'Hero remains fixed in the 16:9 stage')
 
-const source = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+const baselineCity = city.createStableCity()
+assert.equal(baselineCity.buildings.length, 60, 'StableCity keeps all 60 buildings in its data model')
+assert.equal(city.validateStableCity(baselineCity).valid, true, 'StableCity baseline contract still passes')
+assert.equal(city.createStableCity(baselineCity.seed).signature, baselineCity.signature, 'render-only clearing preserves deterministic StableCity signature')
 const sceneSource = await readFile(new URL('../src/CityScene.tsx', import.meta.url), 'utf8')
-const styleSource = await readFile(new URL('../src/style.css', import.meta.url), 'utf8')
-assert.match(source, /cameraModePicker[\s\S]*3Q Elevated/, 'UI exposes the third camera preset')
-assert.match(source, /saveUiDraft\(\{ time, weather, mode,/, 'camera mode remains in UI draft persistence')
-assert.match(sceneSource, /data-hero-aspect=\{mode === 'mega' \? 'fixed' : 'fluid'\}[\s\S]*style=\{mode === 'mega' \? \{ position: 'relative', width: 'min\(100%, 177\.7778cqh\)', height: 'auto', aspectRatio: '16 \/ 9' \}/, 'Hero Canvas host uses its real centered 16:9 drawing surface')
-assert.match(styleSource, /container-type: size; display: grid; place-items: center/,'Hero frame is contained and centered in the responsive slot')
-assert.match(styleSource, /\.scene-caption \{ left: calc\(\(100cqw - min\(100cqw, 177\.7778cqh\)\) \/ 2 \+ 22px\); right: auto;/, 'caption follows the actual 16:9 frame edge and stays in the lower-left title-safe area')
-assert.match(styleSource, /\.scene-grade, [\s\S]*?\.scene-aperture \{ left: 50%; top: 50%; right: auto; bottom: auto; width: min\(100cqw, 177\.7778cqh\); aspect-ratio: 16 \/ 9; transform: translate\(-50%, -50%\); \}/, 'grade and aperture share the exact contained 16:9 Hero frame')
-console.log('ATLAS V2 portal, bridge, camera and caption-safe geometry checks passed.')
+const appSource = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+assert.doesNotMatch(sceneSource, /<Architecture\b|<ThemeSignatureOverlay\b|<MetropolitanLandscape[\s\S]*?metropolis\.(?:visibleBodies|upperMasses|facadePanels|roofs|terraces|windows)\b/, 'ordinary city architecture, window batches, and theme overlay are not mounted')
+assert.doesNotMatch(sceneSource, /snowCaps\(metropolis\.roofs\)|snowCaps\(megaClearance\.visibleBuildings/, 'ordinary building roof snow surfaces are removed')
+assert.doesNotMatch(sceneSource, /\[0, 8\.[69], -30\]|\[x, 4\.25, -30\]|ref=\{train\}|train\.current|position=\{\[0, 9\.45, -30\]\}/, 'legacy elevated line, its piers, and its moving train are removed')
+assert.match(sceneSource, /<instancedMesh ref=\{traffic\}/, 'ground vehicle instances remain mounted')
+assert.match(sceneSource, /<Ground[\s\S]*?<MetropolitanLandscape[\s\S]*?<Megastructure[\s\S]*?<Transport[\s\S]*?<OrbitControls/, 'ground, landscape, Hero, transport, and orbit interaction remain mounted')
+assert.match(sceneSource, /snowCaps\(metropolis\.parks\)/, 'park snow surfaces remain available')
+assert.match(appSource, /city\.buildings\.length/, 'Production Console statistics retain StableCity building counts')
+assert.match(appSource, /city\.signature/, 'Production Console retains StableCity signature diagnostics')
+console.log('P0 cleared-city rendering, through-gate, sloped legs, bridge, cameras and geometry budget checks passed.')

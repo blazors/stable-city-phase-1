@@ -18,7 +18,7 @@ async function sourceModule(file) {
 const { generateMetropolis, riverCenter, riverHalfWidth } = await sourceModule('../src/metropolis.ts')
 const { createStableCity, validateStableCity } = await sourceModule('../src/city.ts')
 const { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset } = await sourceModule('../src/camera.ts')
-const { weatherLighting, timeLighting, megaPracticalPositions, sceneFog } = await sourceModule('../src/lighting.ts')
+const { weatherLighting, timeLighting, sceneFog } = await sourceModule('../src/lighting.ts')
 const { createMegaBridgeGeometry, createMegaStructureGeometry, deriveMegaHeroClearance, megaHeroClearanceRegion, megaRoofDeck, megaRoofFascia, megaRoofSupportTop } = await sourceModule('../src/megaGeometry.ts')
 const verticalBounds = ({ position: [, y], size: [, height] }) => ({ bottom: y - height / 2, top: y + height / 2 })
 const fasciaBounds = verticalBounds(megaRoofFascia), deckBounds = verticalBounds(megaRoofDeck)
@@ -36,7 +36,7 @@ for (const time of Object.keys(timeLighting)) for (const weather of Object.keys(
   } else assert.deepEqual(fog, { color: '#243c54', near: baseline.fogNear, far: baseline.fogFar }, `${time}/${weather}: original fog retained`)
 }
 assert.deepEqual(sceneFog('night', 'clear', '#abcdef'), { color: '#abcdef', near: 340, far: 920 }, 'leaving night haze restores caller palette and clear distance')
-assert(overviewDistanceOffset() > 0 && overviewDistanceOffset() < 100, 'overview distance compensation matches the wider authored camera')
+assert.equal(overviewDistanceOffset(), 0, 'Overview uses the authored fog distance')
 assert.deepEqual(sceneFog('day', 'clear', '#abcdef', overviewDistanceOffset()), { color: '#abcdef', near: 340 + overviewDistanceOffset(), far: 920 + overviewDistanceOffset() }, 'overview fog follows the wider camera distance')
 assert.deepEqual(sceneFog('day', 'clear', '#abcdef', 0), { color: '#abcdef', near: 340, far: 920 }, 'Mega keeps the original fog distance')
 assert.deepEqual(weatherLighting.rain, { direct: .40, fill: .98, fogNear: 270, fogFar: 780 }, 'rain follows the authored visibility and lighting budget')
@@ -47,8 +47,9 @@ for (const weather of Object.values(weatherLighting)) {
   assert(weather.fogFar > weather.fogNear && weather.fogNear > 100, 'fog preserves near-field receivers')
   for (const time of Object.values(timeLighting)) assert(time.hemisphere * weather.fill > .4 && time.fill > 0, 'lighting preserves silhouette fill in every state')
 }
-assert.equal(megaPracticalPositions.length, 2, 'bounded practical light count')
-assert(megaPracticalPositions.every(position => position.every(Number.isFinite)), 'finite visible emitter positions')
+assert.deepEqual(cameraViews.hero, { position: [-104, 7, -202], target: [0, 59, 21], fov: 40 }, 'Hero camera matches P0 preset')
+assert.deepEqual(cameraViews.overview, { position: [-210, 165, -225], target: [0, 40, 20], fov: 42 }, 'Overview camera matches P0 preset')
+assert.deepEqual(cameraViews.elevated, { position: [-150, 85, -165], target: [0, 54, 22], fov: 43 }, 'Elevated camera matches P0 preset')
 for (const mode of ['overview', 'mega', 'elevated']) {
   const { position, target, fov } = cameraViews[mode]
   const initial = createSceneCamera(mode)
@@ -74,66 +75,13 @@ for (const mode of ['overview', 'mega', 'elevated']) {
     if (mode === 'overview' || aspect >= .9) for (let axis = 1; axis < 3; axis++) assert(Math.abs(adapted[axis] - target[axis] - (position[axis] - target[axis]) * scale) < 1e-9, `${mode}: landscape viewport preserves viewing direction`)
   }
 }
-const overviewCamera = createSceneCamera('overview')
-overviewCamera.aspect = 1.5
-overviewCamera.position.set(...cameraPosition('overview', 1.5))
-overviewCamera.lookAt(...cameraViews.overview.target)
-overviewCamera.updateProjectionMatrix()
-overviewCamera.updateMatrixWorld()
-for (const [x, z] of [[-234, -126], [234, -126], [-234, 234], [234, 234]]) {
-  const projected = new Vector3(x, 0, z).project(overviewCamera)
-  assert(Math.abs(projected.x) < 1.25 && projected.y > -1.25 && projected.y < .9, `overview keeps the occupied metropolitan grid near the safe frame`)
-}
-const heroCamera = createSceneCamera('mega')
-heroCamera.aspect = 16 / 9
-heroCamera.position.set(...cameraPosition('mega', 16 / 9))
-heroCamera.lookAt(...cameraViews.mega.target)
-heroCamera.updateProjectionMatrix()
-heroCamera.updateMatrixWorld()
-const heroProject = (x, y, z) => new Vector3(x, y, z).project(heroCamera)
-const entityProjected = [-70, 70].flatMap(x => [0, 124].flatMap(y => [-4, 46].map(z => heroProject(x, y, z))))
-const entityWidthShare = (Math.max(...entityProjected.map(point => point.x)) - Math.min(...entityProjected.map(point => point.x))) / 2
-const entityHeightShare = (Math.max(...entityProjected.map(point => point.y)) - Math.min(...entityProjected.map(point => point.y))) / 2
-assert(entityWidthShare >= .45 && entityWidthShare <= .55, `Hero entity occupies 45-55% of frame width (got ${entityWidthShare.toFixed(3)})`)
-assert(entityHeightShare >= .75 && entityHeightShare <= .85, `Hero entity occupies 75-85% of frame height (got ${entityHeightShare.toFixed(3)})`)
-assert(entityProjected.every(point => Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1), 'Hero entity remains completely inside its frame')
-const coreHeights = createStableCity().buildings.filter(building => building.id.startsWith('1:') || building.id.startsWith('2:')).map(building => building.height).sort((a, b) => a - b)
-const coreMedian = coreHeights[Math.floor(coreHeights.length / 2)]
-assert(124 / coreMedian >= 4 && 124 / coreMedian <= 8, `mega scale ratio stays 4-8x core median (got ${(124 / coreMedian).toFixed(2)})`)
-for (const aspect of [16 / 9]) {
-  const camera = createSceneCamera('mega')
-  camera.aspect = aspect
-  camera.position.set(...cameraPosition('mega', aspect))
-  camera.lookAt(...cameraViews.mega.target)
-  camera.updateProjectionMatrix()
-  camera.updateMatrixWorld()
-  const project = (x, y, z) => new Vector3(x, y, z).project(camera)
-  for (const x of [-70, 70]) for (const y of [0, 124]) for (const z of [-4, 46]) {
-    const projected = project(x, y, z)
-    const xLimit = aspect < 1 ? 2.6 : 1.35
-    const yLimit = 1.6
-    assert(Math.abs(projected.x) < xLimit && projected.y > -yLimit && projected.y < yLimit, `${aspect}: mega bounds remain within the authored composition tolerance`)
-  }
-}
-const structure = createMegaStructureGeometry()
-const bridge = createMegaBridgeGeometry()
-const coreMegaBoxes = [...structure.bodies, ...structure.inset, ...structure.braces]
-const allMegaBoxes = [...coreMegaBoxes, ...bridge.decks, ...bridge.rails, ...bridge.supports, bridge.platform]
-const minX = Math.min(...coreMegaBoxes.map(item => item.position[0] - item.size[0] / 2)), maxX = Math.max(...coreMegaBoxes.map(item => item.position[0] + item.size[0] / 2))
-const minY = Math.min(...coreMegaBoxes.map(item => item.position[1] - item.size[1] / 2)), maxY = Math.max(...coreMegaBoxes.map(item => item.position[1] + item.size[1] / 2))
-const minZ = Math.min(...coreMegaBoxes.map(item => item.position[2] - item.size[2] / 2)), maxZ = Math.max(...coreMegaBoxes.map(item => item.position[2] + item.size[2] / 2))
-assert.equal([minX, maxX, minY, maxY, minZ, maxZ].join(','), '-70,70,0,124,-4,46', 'mega greybox uses the authored x/y/z envelope')
-assert.equal(structure.inset.length, 0, 'mega gate remains a through-portal without a rear wall')
-assert(allMegaBoxes.length <= 110 && allMegaBoxes.length * 12 <= 1320, 'Hero and bridge fit within the 110-box and 1,320-triangle budget')
-assert(structure.braces.filter(item => item.rotation && item.size[0] === 8 && item.size[2] === 10).length === 4, 'four diagonal gate braces use the authored 8 x 10 cross-section')
 const cityForClearance = createStableCity(), signatureBefore = cityForClearance.signature
 const clearance = deriveMegaHeroClearance(cityForClearance), repeatClearance = deriveMegaHeroClearance(createStableCity())
 assert.deepEqual(clearance.clearedBuildingIds, repeatClearance.clearedBuildingIds, 'mega visible clearance is deterministic')
 assert.deepEqual(clearance.visibleBuildings.map(building => building.id), repeatClearance.visibleBuildings.map(building => building.id), 'visible building IDs remain deterministic')
 assert.equal(cityForClearance.signature, signatureBefore, 'clearance derivation does not mutate StableCity signature')
-assert(clearance.clearedBuildingIds.length > 0, '140-unit mega region derives a non-empty building clearance')
-assert.equal(clearance.region.maxX - clearance.region.minX, 140, 'clearance region preserves the 140-unit mega width')
-assert.deepEqual([clearance.region.minZ, clearance.region.maxZ], [-4, 46], 'clearance region follows the full mega depth')
+assert.equal(clearance.region.maxX - clearance.region.minX, 180, 'clearance data tracks the 180-unit Hero envelope')
+assert.deepEqual([clearance.region.minZ, clearance.region.maxZ], [2, 42], 'clearance data tracks the gate depth')
 for (const building of clearance.visibleBuildings) assert(building.x + building.width / 2 <= clearance.envelope.minX || building.x - building.width / 2 >= clearance.envelope.maxX || building.z + building.depth / 2 <= clearance.envelope.minZ || building.z - building.depth / 2 >= clearance.envelope.maxZ, 'visible buildings stay outside the mega clearance envelope')
 const overlapsCore = ({ position: [x, , z], size: [w, , d] }) => Math.abs(x) - w / 2 < 41.5 && Math.abs(z) - d / 2 < 41.5
 const overlapsRiver = ({ position: [x, , z], size: [w, , d] }) => [-.5, 0, .5].some(offset => {

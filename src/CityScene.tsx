@@ -1,10 +1,9 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react'
-import { Color, InstancedMesh, Object3D, type Group, type ShaderMaterial } from 'three'
+import { Color, InstancedMesh, Object3D, type ShaderMaterial } from 'three'
 import { createStableCity, type TimeOfDay } from './city'
 import { themeSpecs, type ThemeName } from './theme'
-import { buildThemeSignature } from './themeSignature'
 import { generateMetropolis, riverReflectionSources, riverShader } from './metropolis'
 import { Atmosphere, environmentPalette, sunDirection, type Weather } from './Atmosphere'
 import { Rain, Snow } from './Precipitation'
@@ -12,21 +11,17 @@ import { LensWeather } from './LensWeather'
 import { puddleBudgets, rainBudgets, rainPatches } from './rain'
 import { snowBudgets, snowCaps, snowRoadEdges } from './snow'
 import { cameraPosition, cameraViews, createSceneCamera, overviewDistanceOffset, type CameraMode } from './camera'
-import { megaPracticalPositions, sceneFog, timeLighting, weatherLighting } from './lighting'
-import { createMegaBridgeGeometry, createMegaStructureGeometry, deriveMegaHeroClearance, intersectsMegaBridgeCorridor, intersectsMegaHeroFootprint, megaRoofDeck } from './megaGeometry'
+import { sceneFog, timeLighting, weatherLighting } from './lighting'
+import { createMegaBridgeGeometry, createMegaStructureGeometry } from './megaGeometry'
 import { HeightFog } from './HeightFog'
 import { heightFogBudgets, heightFogDensity, heightFogGLSL } from './heightFogModel'
 import { applyMoodPalette, type ResolvedMood } from './mood'
 
 const city = createStableCity()
-const megaClearance = deriveMegaHeroClearance(city)
 const metropolis = generateMetropolis(city.seed)
 const snowSurfaces = [
-  ...snowCaps(megaClearance.visibleBuildings.map(b => ({ position: [b.x, b.height + .16, b.z] as Vec3, size: [b.width + .22, .32, b.depth + .22] as Vec3 }))),
-  ...snowCaps(megaClearance.visibleBuildings.map(b => ({ position: [b.x, b.height + .7, b.z] as Vec3, size: [b.width * .57, 1.1, b.depth * .58] as Vec3 }))),
-  ...snowCaps(metropolis.roofs), ...snowCaps(metropolis.parks), ...snowCaps(metropolis.publicSpaceSnowSurfaces),
+  ...snowCaps(metropolis.parks),
   ...snowRoadEdges(metropolis.roads),
-  ...snowCaps([megaRoofDeck]),
   ...snowCaps(city.blocks.filter(b => b.kind === 'void').map(b => ({ position: [b.x, .12, b.z] as Vec3, size: [14, .24, 14] as Vec3 }))),
   ...snowRoadEdges([-36, -18, 0, 18, 36].flatMap(v => [
     { position: [v, .025, 0] as Vec3, size: [v === 0 ? 4.6 : 3, .05, 78] as Vec3 },
@@ -35,7 +30,7 @@ const snowSurfaces = [
 ]
 export const metropolitanBuildingCount = metropolis.buildings.length
 type Vec3 = [number, number, number]
-type Box = { position: Vec3; size: Vec3; color?: string; tower?: boolean; rotation?: Vec3 }
+type Box = { position: Vec3; size: Vec3; color?: string; tower?: boolean; rotation?: Vec3; quaternion?: [number, number, number, number] }
 export type RenderMetrics = { fps: number; frameMs: number; calls: number; triangles: number; validFrames: number; sampleDurationMs: number; configRevision: number }
 export type SceneCanvasHandle = { capture: () => Promise<{ blob: Blob; width: number; height: number }>; camera: () => { position: [number, number, number]; target: [number, number, number]; fov: number } }
 type CanvasMetrics = Omit<RenderMetrics, 'configRevision'>
@@ -63,6 +58,7 @@ function Boxes({ items, color = '#ffffff', glow = false, night = false, foliage 
     items.forEach((item, i) => {
       object.position.set(...item.position)
       object.rotation.set(...(item.rotation ?? [0, 0, 0]))
+      if (item.quaternion) object.quaternion.set(...item.quaternion)
       object.scale.set(...item.size)
       object.updateMatrix()
       ref.current!.setMatrixAt(i, object.matrix)
@@ -99,43 +95,6 @@ function SnowSurfaces({ items, color }: { items: Box[]; color: string }) {
   </instancedMesh>
 }
 
-function Architecture({ theme, night, detail }: { theme: ThemeName | null; night: boolean; detail: number }) {
-  const { masses, trim, glass, windows, landscape } = useMemo(() => {
-    const primary = theme ? themeSpecs[theme].primary : '#536d72'
-    const spec = theme ? themeSpecs[theme] : null
-    const masses: Box[] = [], trim: Box[] = [], glass: Box[] = [], windows: Box[] = [], landscape: Box[] = []
-    megaClearance.visibleBuildings.forEach((b, index) => {
-      const color = spec
-        ? (b.tone > .55 ? spec.bodyLight : spec.bodyDark)
-        : new Color(primary).lerp(new Color(b.tone > .55 ? '#d5cfb6' : '#273e4c'), b.tone > .55 ? .56 : .23).getStyle()
-      masses.push({ position: [b.x, b.height / 2, b.z], size: [b.width, b.height, b.depth], color })
-      trim.push({ position: [b.x, .35, b.z], size: [b.width + .6, .7, b.depth + .6] })
-      trim.push({ position: [b.x, b.height + .16, b.z], size: [b.width + .22, .32, b.depth + .22] })
-      masses.push({ position: [b.x, b.height + .7, b.z], size: [b.width * .57, 1.1, b.depth * .58], color })
-      for (let y = 1.6; y < b.height - .7; y += detail > .8 ? 1.65 : detail > .55 ? 2.15 : 3.1) {
-        glass.push({ position: [b.x, y, b.z], size: [b.width + .025, .52, b.depth + .025] })
-        if ((Math.floor(y) + index) % 3 !== 0) {
-          windows.push({ position: [b.x + b.width * .19, y, b.z - b.depth / 2 - .025], size: [b.width * .25, .29, .035] })
-          windows.push({ position: [b.x + b.width / 2 + .025, y, b.z - b.depth * .18], size: [.035, .29, b.depth * .3] })
-        }
-      }
-      // Vertical stone fins break the horizontal bands without changing base mass.
-      if (detail > .55) for (const offset of [-.32, .32]) trim.push({ position: [b.x + b.width * offset, b.height / 2, b.z], size: [.16, b.height, b.depth + .11] })
-    })
-    for (const block of city.blocks.filter(b => b.kind === 'void')) {
-      trim.push({ position: [block.x, .12, block.z], size: [14, .24, 14] })
-      glass.push({ position: [block.x, .28, block.z], size: [8, .12, 9] })
-      for (const x of [-5.8, 5.8]) for (const z of [-5, 0, 5]) {
-        masses.push({ position: [block.x + x, 1, block.z + z], size: [.25, 2, .25], color: '#6b6954' })
-        landscape.push({ position: [block.x + x, 2.5, block.z + z], size: [2.1, 2.2, 2.1], color: spec ? spec.foliage : (z === 0 ? '#7c937e' : '#4c7267') })
-      }
-    }
-    return { masses, trim, glass, windows, landscape }
-  }, [theme, detail])
-  const response = theme ? themeSpecs[theme].materialResponse : null
-  return <><Boxes items={masses} roughness={response?.coreBody.roughness} metalness={response?.coreBody.metalness} /><Boxes items={trim} color={theme ? themeSpecs[theme].trim : '#8b9d95'} roughness={response?.coreTrim.roughness} metalness={response?.coreTrim.metalness} /><Boxes items={glass} color={theme ? themeSpecs[theme].glass : '#405e67'} roughness={response?.coreGlass.roughness} metalness={response?.coreGlass.metalness} /><Boxes items={landscape} /><Boxes items={windows} color={night ? '#f2c17e' : '#687f82'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? 1.4 : .08} glow night={night} /></>
-}
-
 const themeMix = .25
 function tintSeededItems(items: Box[], target: string, fallback: string): Box[] {
   const targetColor = new Color(target), targetHsl = targetColor.getHSL({ h: 0, s: 0, l: 0 })
@@ -147,31 +106,7 @@ function tintSeededItems(items: Box[], target: string, fallback: string): Box[] 
   })
 }
 
-function MegaPracticalHalo({ accent, time, quality, intensity = 1 }: { accent: string; time: TimeOfDay; quality: QualityPreset; intensity?: number }) {
-  const ref = useRef<InstancedMesh>(null)
-  const uniforms = useMemo(() => ({ uColor: { value: new Color(accent) }, uOpacity: { value: (time === 'night' ? .24 : .065) * intensity } }), [accent, intensity, time])
-  useLayoutEffect(() => {
-    if (!ref.current) return
-    const object = new Object3D()
-    megaPracticalPositions.forEach((position, index) => {
-      object.position.set(position[0], position[1], position[2] + .12)
-      object.updateMatrix()
-      ref.current!.setMatrixAt(index, object.matrix)
-    })
-    ref.current.instanceMatrix.needsUpdate = true
-    ref.current.computeBoundingSphere()
-  }, [])
-  if (time === 'day' || quality === 'low') return null
-  return <instancedMesh ref={ref} args={[undefined, undefined, megaPracticalPositions.length]} frustumCulled={false} raycast={() => null}>
-    <planeGeometry args={[2.4, 16.4]} />
-    <shaderMaterial uniforms={uniforms} transparent depthTest depthWrite={false} vertexShader={`varying vec2 vUv;
-      void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`}
-      fragmentShader={`varying vec2 vUv; uniform vec3 uColor; uniform float uOpacity;
-      void main(){ vec2 p=vUv-.5; float edge=1.0-smoothstep(.18,.52,length(vec2(p.x*.95,p.y*.62))); float vertical=smoothstep(.03,.18,vUv.y)*(1.0-smoothstep(.82,.97,vUv.y)); gl_FragColor=vec4(uColor,edge*vertical*uOpacity); }`} />
-  </instancedMesh>
-}
-
-function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { accent: string; theme: ThemeName | null; night: boolean; sunset: boolean; quality: QualityPreset; time: TimeOfDay; mood?: ResolvedMood }) {
+function Megastructure({ theme }: { theme: ThemeName | null }) {
   const structure = useMemo(() => createMegaStructureGeometry(), [])
   const bridge = useMemo(() => createMegaBridgeGeometry(), [])
   const spec = theme ? themeSpecs[theme] : null
@@ -183,16 +118,9 @@ function Megastructure({ accent, theme, night, sunset, quality, time, mood }: { 
     <Boxes color={spec?.megaInset ?? '#2e525a'} roughness={spec?.materialResponse.megaInset.roughness ?? .82} metalness={spec?.materialResponse.megaInset.metalness ?? .04} items={[
       ...structure.inset,
     ]} />
-    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, bridge.platform]} />
+    <Boxes color={spec?.megaBody ?? '#d4ccb1'} items={[...bridge.decks, ...bridge.joints]} />
     <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.supports} />
-    <Boxes color={accent} emissive={accent} glow night={night} items={bridge.rails} />
-    <Boxes color={accent} emissive={accent} glow night={night} items={[
-      { position: [0, 88.05, 18], size: [132, .08, .15] },
-      ...megaPracticalPositions.map(position => ({ position, size: [.12, 17, .15] as Vec3 })),
-      { position: [0, 65.5, .8], size: [66, .16, .16] },
-    ]} />
-    {(night || (mood?.lightLevel ?? 0) > .65) && megaPracticalPositions.map(position => <pointLight key={position[0]} position={position} color={accent} intensity={28 * (.35 + (mood?.lightLevel ?? .65))} distance={16} decay={2} />)}
-    <MegaPracticalHalo accent={accent} time={sunset ? 'sunset' : time} quality={quality} intensity={.5 + (mood?.lightLevel ?? .55)} />
+    <Boxes color={spec?.trim ?? '#e2dac3'} items={bridge.rails} />
   </>
 }
 
@@ -327,7 +255,6 @@ function Ground({ time, weather, mode, quality, mood }: { time: TimeOfDay; weath
         lamps.push({ position: [p, 2.2, side * 39], size: [.3, .18, .3] })
       }
     }
-    for (let x = -36; x <= 36; x += 9) supports.push({ position: [x, 4.25, -30], size: [.6, 8.5, .6] })
     return { paving, road, markings, lamps, supports }
   }, [])
   const roads = useMemo(() => [...details.road, ...metropolis.roads], [details])
@@ -341,8 +268,6 @@ function Ground({ time, weather, mode, quality, mood }: { time: TimeOfDay; weath
     <Boxes color="#abb9ac" items={details.markings} />
     <Boxes color="#738c87" items={details.supports} />
     <Boxes color="#f2c17e" items={details.lamps} glow night={night} />
-    <Boxes color="#b1b5a3" items={[{ position: [0, 8.6, -30], size: [76, .5, 2.5] }]} />
-    <Boxes color="#3a545b" items={[{ position: [0, 8.9, -30], size: [76, .12, 1.8] }]} />
   </>
 }
 
@@ -376,48 +301,22 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
       land: tintSeededItems(metropolis.land, spec.bodyDark, '#778782'),
       parks: tintSeededItems(metropolis.parks, spec.foliage, '#526f56'),
       paths: tintSeededItems(metropolis.paths, spec.trim, '#a9ac96'),
-      visibleBodies: tintSeededItems(metropolis.visibleBodies, spec.bodyLight, '#ffffff'),
-      upperMasses: tintSeededItems(metropolis.upperMasses, spec.bodyLight, '#ffffff'),
-      facadePanels: tintSeededItems(metropolis.facadePanels, spec.glass, '#ffffff'),
-      roofs: tintSeededItems(metropolis.roofs, spec.trim, '#8a9c97'),
-      terraces: tintSeededItems(metropolis.terraces, spec.bodyDark, '#ffffff'),
       trees: tintSeededItems(metropolis.trees, spec.foliage, '#ffffff'),
     }
   }, [theme])
   const land = themed?.land ?? metropolis.land, parks = themed?.parks ?? metropolis.parks
   const paths = themed?.paths ?? metropolis.paths
-  const intersectsMega = (item: Box) => intersectsMegaHeroFootprint(item.position, item.size, 1) || intersectsMegaBridgeCorridor(item.position, item.size, 1)
-  const visibleBodies = (themed?.visibleBodies ?? metropolis.visibleBodies).filter(item => !intersectsMega(item))
-  const upperMasses = (themed?.upperMasses ?? metropolis.upperMasses).filter(item => !intersectsMega(item))
-  const facadePanels = (themed?.facadePanels ?? metropolis.facadePanels).filter(item => !intersectsMega(item))
-  const roofs = (themed?.roofs ?? metropolis.roofs).filter(item => !intersectsMega(item)), allTerraces = (themed?.terraces ?? metropolis.terraces).filter(item => !intersectsMega(item))
-  const allTrees = (themed?.trees ?? metropolis.trees).filter(item => !intersectsMega(item))
-  const parkClearTrees = allTrees.filter(tree => !metropolis.publicSpaceTreeClearance.some(bound =>
-    Math.abs(tree.position[0] - bound.position[0]) < (tree.size[0] + bound.size[0]) / 2 &&
-    Math.abs(tree.position[2] - bound.position[2]) < (tree.size[2] + bound.size[2]) / 2,
-  ))
+  const allTrees = themed?.trees ?? metropolis.trees
   const pick = <T,>(items: T[], ratio: number) => items.slice(0, Math.ceil(items.length * ratio))
-  const trees = quality === 'high' || quality === 'auto' ? parkClearTrees : pick(parkClearTrees, quality === 'balanced' ? .75 : .5)
-  const windows = quality === 'high' || quality === 'auto' ? metropolis.windows : pick(metropolis.windows, quality === 'balanced' ? .6 : .3)
-  const warmWindows = windows.filter(({ position: [, , z] }) => z <= 92)
-  const coolWindows = windows.filter(({ position: [, , z] }) => z > 92)
+  const treeBudget = quality === 'high' || quality === 'auto' ? 180 : quality === 'balanced' ? 120 : 72
+  const trees = pick(allTrees, Math.min(1, treeBudget / Math.max(1, allTrees.length)))
   const lights = quality === 'high' || quality === 'auto' ? metropolis.lights : pick(metropolis.lights, quality === 'balanced' ? .75 : .5)
-  const terraces = quality === 'low' ? allTerraces.filter(item => item.tower) : allTerraces
   return <>
     <Boxes items={land} color={theme ? '#ffffff' : '#778782'} />
     <Boxes items={parks} color={theme ? '#ffffff' : '#526f56'} />
     <Boxes items={paths} color={theme ? '#ffffff' : '#a9ac96'} />
     <Boxes items={metropolis.roads} color={weather === 'rain' ? '#304953' : '#485f65'} wet={weather === 'rain'} />
-    <Boxes items={metropolis.publicSpaceStructures} roughness={.78} metalness={.03} />
-    {night && <Boxes items={metropolis.publicSpaceLights} color="#ffffff" emissive="#6b482d" glow night emissiveIntensity={.22} />}
-    <Boxes items={visibleBodies} roughness={.88} metalness={.02} />
-    <Boxes items={upperMasses} roughness={.88} metalness={.02} />
-    <Boxes items={facadePanels} roughness={.82} metalness={.04} />
-    <Boxes items={roofs} color={theme ? '#ffffff' : '#8a9c97'} roughness={.90} metalness={.02} />
-    <Boxes items={terraces} />
     <Boxes items={trees} foliage />
-    <Boxes items={warmWindows} color={night ? '#eabb7a' : '#496876'} emissive={theme ? themeSpecs[theme].emission : undefined} emissiveIntensity={night ? .78 : .08} glow night={night} />
-    <Boxes items={coolWindows} color={night ? '#607f91' : '#496876'} emissive={night ? '#58798c' : undefined} emissiveIntensity={night ? .12 : .04} glow night={night} />
     <Boxes items={lights} color="#e9b779" glow night={night} emissiveIntensity={night ? .65 : .06} />
     <Boxes items={metropolis.routeLights} color="#d6a66e" glow night={night} emissiveIntensity={night ? .55 : .025} />
     {metropolis.bridges.map(({ x, z, span }) => <group key={x} position={[x, 0, z]}>
@@ -425,27 +324,14 @@ function MetropolitanLandscape({ theme, night, weather, quality }: { theme: Them
       <Boxes color="#f0c78e" glow night={night} items={[-2.4, 2.4].map(v => ({ position: [v, 1.4, 0], size: [.13, .2, span] }))} />
       {[-2.3, 2.3].map(v => <mesh key={v} position={[v, 1, 0]} rotation-y={Math.PI / 2} scale={[1, .3, 1]}><torusGeometry args={[span / 2 - 2, .24, 6, 40, Math.PI]} /><meshStandardMaterial color="#a8c4c3" roughness={.6} /></mesh>)}
     </group>)}
-    {night && <><pointLight position={[0, 8, 2]} color="#ffd098" intensity={450} distance={48} decay={2} /><pointLight position={[-11, 16, 2]} color="#ffb86d" intensity={180} distance={28} decay={2} /></>}
-  </>
-}
-
-function ThemeSignatureOverlay({ theme, night }: { theme: ThemeName; night: boolean }) {
-  const signature = useMemo(() => buildThemeSignature(theme), [theme])
-  const bodies = useMemo(() => [...signature.bodies, ...signature.attachments].filter(item => item.slot !== 'hero'), [signature])
-  const spec = themeSpecs[theme]
-  return <>
-    <Boxes items={bodies} roughness={.78} metalness={.04} castShadow={false} receiveShadow={false} />
-    {night && <Boxes items={signature.accents.filter(item => item.slot !== 'hero')} color="#ffffff" glow night emissive={spec.emission} emissiveIntensity={.18} castShadow={false} receiveShadow={false} />}
   </>
 }
 
 function Transport({ night, count }: { night: boolean; count: number }) {
-  const train = useRef<Group>(null)
   const traffic = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    if (train.current) train.current.position.x = Math.sin(t * .12) * 31
     if (!traffic.current) return
     for (let i = 0; i < count; i++) {
       const direction = i % 2 ? 1 : -1
@@ -458,10 +344,6 @@ function Transport({ night, count }: { night: boolean; count: number }) {
     traffic.current.instanceMatrix.needsUpdate = true
   })
   return <>
-    <group ref={train} position={[0, 9.45, -30]}>
-      <Boxes color="#ddd2b0" items={[-2.8, 0, 2.8].map(x => ({ position: [x, 0, 0], size: [2.6, 1, 1.5] }))} />
-      <Boxes color={night ? '#f2c17e' : '#2e535f'} glow night={night} items={[-2.8, 0, 2.8].map(x => ({ position: [x, .12, -.76], size: [2.1, .37, .025] }))} />
-    </group>
     <instancedMesh ref={traffic} args={[undefined, undefined, count]} frustumCulled={false} castShadow><boxGeometry /><meshStandardMaterial color="#d4bc92" roughness={.65} emissive="#b58241" emissiveIntensity={night ? .5 : 0} /></instancedMesh>
   </>
 }
@@ -571,12 +453,11 @@ export function Scene({ time, mode, theme, enabled, weather = 'clear', quality =
     <hemisphereLight args={[p.ambient, '#4c5159', lighting.hemisphere * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)]} />
     <directionalLight position={[-80, 65, -100]} color={p.ambient} intensity={lighting.fill * weatherLight.fill * (.72 + (mood?.lightLevel ?? .55) * .28)} />
     <directionalLight position={lightPosition} color={p.sun} intensity={p.power * weatherLight.direct * (.72 + (mood?.lightLevel ?? .55) * .28)} castShadow shadow-mapSize={[renderQualityBudgets[quality].shadowMapSize, renderQualityBudgets[quality].shadowMapSize]} shadow-camera-left={-70} shadow-camera-right={70} shadow-camera-top={110} shadow-camera-bottom={-25} shadow-camera-far={260} shadow-normalBias={.08} shadow-bias={-.00015} />
-    <Ground time={time} weather={effectiveWeather} mode={mode} quality={quality} mood={mood} /><Architecture theme={enabled ? theme : null} night={night} detail={config.detail} />
+    <Ground time={time} weather={effectiveWeather} mode={mode} quality={quality} mood={mood} />
     <MetropolitanLandscape theme={enabled ? theme : null} night={night} weather={effectiveWeather} quality={quality} />
-    {enabled && <ThemeSignatureOverlay theme={theme} night={night} />}
     {effectiveWeather === 'rain' && <Rain count={Math.round(rainBudgets[quality] * (mood?.wetnessLevel ? .7 + mood.wetnessLevel * .3 : 1))} night={night} />}
     {effectiveWeather === 'snow' && <><SnowSurfaces items={snowSurfaces} color={night ? '#a2b4c5' : '#c6d5da'} /><Snow count={snowBudgets[quality]} night={night} /></>}
-    <Megastructure accent={enabled ? themeSpecs[theme].emission : '#b1a286'} theme={enabled ? theme : null} night={night} sunset={time === 'sunset'} time={time} quality={quality} mood={mood} /><Transport night={night} count={config.traffic} />
+    <Megastructure theme={enabled ? theme : null} /><Transport night={night} count={config.traffic} />
     <OrbitControls ref={controls} key={mode} makeDefault target={cameraViews[mode].target} maxPolarAngle={Math.PI / 2.12} minDistance={25} maxDistance={mode === 'overview' ? 1700 : 800} enableDamping dampingFactor={.06} />
     <WebGLGuard onError={onError} />
     <LensWeather time={time} weather={effectiveWeather} quality={quality} mode={mode} />
